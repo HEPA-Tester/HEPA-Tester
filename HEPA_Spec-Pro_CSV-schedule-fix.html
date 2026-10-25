@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HVAC & HEPA Filter Field Testing & Calibration Suite</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .canvas-container { position: relative; width: 100%; touch-action: none; }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col bg-slate-100 min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-sky-600 p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-fan fa-spin text-xl" style="animation-duration: 8s;"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-none tracking-tight">HEPA Spec-Pro</h1>
+                        <p class="text-xs text-slate-400 mt-0.5">GMP Validation & Field Testing</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="flex space-x-1 sm:space-x-2 bg-slate-800 p-1 rounded-xl border border-slate-700">
+                    <button id="tab-btn-testing" onclick="switchTab('testing')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-sky-600 text-white shadow-sm">
+                        <i class="fa-solid fa-vial-circle-check mr-1.5"></i>Filter Testing
+                    </button>
+                    <button id="tab-btn-calibration" onclick="switchTab('calibration')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i class="fa-solid fa-sliders mr-1.5"></i>Equipment Vault
+                    </button>
+                    <button id="tab-btn-records" onclick="switchTab('records')" class="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                        <i class="fa-solid fa-database mr-1.5"></i>Test Vault <span id="vault-count-badge" class="ml-1 px-1.5 py-0.2 bg-sky-500 text-white text-[10px] rounded-full">0</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ================= TAB 1: FILTER TESTING ================= -->
+        <div id="tab-content-testing" class="space-y-6">
+
+            <!-- Daily Start Setup Banner -->
+            <div id="setup-banner" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
+                <div class="bg-slate-800 text-white px-5 py-3.5 flex justify-between items-center cursor-pointer select-none" onclick="toggleSetupBannerCollapse()">
+                    <div class="flex items-center space-x-3">
+                        <i id="setup-lock-icon" class="fa-solid fa-lock text-amber-400"></i>
+                        <h2 class="font-semibold text-sm sm:text-base">Daily Start Equipment & Tester Verification</h2>
+                        <span id="setup-status-tag" class="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30">Action Required</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-toggle-lock" onclick="event.stopPropagation(); toggleSetupLock()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-md transition text-slate-200 border border-slate-600">
+                            Setup Unlocked
+                        </button>
+                        <i id="setup-chevron" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </div>
+                </div>
+
+                <div id="setup-body" class="p-5 space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Tester Initials / Tech ID <span class="text-red-500">*</span></label>
+                            <input type="text" id="setup-tester-initials" maxlength="30" placeholder="e.g. J.D. (TECH-09)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Test Date (GMP Standard)</label>
+                            <input type="text" id="setup-test-date" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 cursor-not-allowed">
+                        </div>
+                        <div class="md:col-span-2 flex items-end justify-end">
+                            <p class="text-xs text-slate-500 italic"><i class="fa-solid fa-circle-info text-sky-500 mr-1"></i>Equipment details auto-validate against equipment master vault.</p>
+                        </div>
+                    </div>
+
+                    <!-- 5 Mandatory Verification Rows -->
+                    <div class="space-y-3">
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Calibration Instruments</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-5 gap-3" id="equipment-setup-rows">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button onclick="lockAndVerifySetup()" class="bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs sm:text-sm px-5 py-2.5 rounded-lg shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-circle-check mr-2"></i> Lock Equipment Verification & Proceed
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JOB SCHEDULE UPLOAD & FILTER SELECTOR BAR -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <div class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl border border-indigo-100">
+                        <i class="fa-solid fa-file-excel text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-800 uppercase">Job Filter Schedule</h3>
+                        <p id="schedule-status-text" class="text-[11px] text-slate-500">No job schedule loaded. Upload a CSV with a Filter ID column (Room, AHU, Size, Aspect Ratio optional).</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <input type="file" id="job-csv-input" accept=".csv" class="hidden" onchange="handleJobCSVImport(event)">
+                    <button onclick="document.getElementById('job-csv-input').click()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-lg font-semibold transition flex items-center shadow-sm">
+                        <i class="fa-solid fa-upload mr-1.5"></i>Upload Schedule CSV
+                    </button>
+                    <button onclick="clearJobSchedule()" id="btn-clear-schedule" class="hidden text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium transition">
+                        Clear Schedule
+                    </button>
+                </div>
+            </div>
+
+            <!-- Testing Workspace Form -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-6">
+                
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-100 gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-filter text-sky-600 mr-2"></i>
+                            <span id="form-mode-title">Filter Inspection & Leak Test</span>
+                        </h2>
+                        <p class="text-xs text-slate-500">Filter Face testing zone.</p>
+                    </div>
+                    <div id="editing-badge" class="hidden bg-amber-100 text-amber-800 border border-amber-300 text-xs px-3 py-1 rounded-full font-semibold flex items-center">
+                        <i class="fa-solid fa-pen-to-square mr-1.5"></i> Editing Record Mode
+                        <button onclick="cancelEditing()" class="ml-2 text-amber-900 hover:text-black font-bold">✕</button>
+                    </div>
+                </div>
+
+                <!-- FILTER SEARCH / SCHEDULE SELECTOR (If Schedule Loaded) -->
+                <div id="schedule-search-container" class="hidden bg-sky-50/70 border border-sky-200 p-4 rounded-xl space-y-3">
+                    <label class="block text-xs font-bold text-sky-900 uppercase tracking-wider"><i class="fa-solid fa-magnifying-glass mr-1"></i> Quick-Select Filter from Job Schedule</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input type="text" id="schedule-search" oninput="renderScheduleSelector()" placeholder="Search tag, room or AHU..." class="bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        <select id="schedule-ahu-filter" onchange="renderScheduleSelector()" class="bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="">All AHUs</option>
+                        </select>
+                        <label class="flex items-center space-x-2 text-xs text-sky-900 font-medium bg-white border border-sky-300 rounded-lg px-3 py-2 cursor-pointer select-none">
+                            <input type="checkbox" id="schedule-hide-tested" onchange="renderScheduleSelector()" class="rounded border-sky-400">
+                            <span>Hide already tested</span>
+                        </label>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="schedule-filter-select" onchange="onSelectScheduleFilter(this.value)" class="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="">-- Choose filter from uploaded schedule --</option>
+                        </select>
+                        <button type="button" onclick="selectNextUntested()" class="whitespace-nowrap text-xs bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg font-semibold transition">Next untested &rarr;</button>
+                    </div>
+                    <div id="schedule-count-text" class="text-[11px] text-sky-800"></div>
+                    <div id="selected-schedule-meta" class="text-[11px] text-sky-800 font-medium hidden space-y-0.5">
+                        <div>Room: <span id="meta-room" class="font-bold">---</span> | AHU: <span id="meta-ahu" class="font-bold">---</span> | Size: <span id="meta-size" class="font-bold">---</span> | Aspect: <span id="meta-aspect" class="font-bold">---</span></div>
+                        <div id="meta-extra" class="text-sky-700"></div>
+                        <div id="meta-warn" class="text-amber-700 font-semibold"></div>
+                    </div>
+                </div>
+
+
+                <!-- TOP SECTION: Essential Specs -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div class="lg:col-span-2 space-y-1">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Filter Tag / ID <span class="text-red-500">*</span></label>
+                        <div class="flex items-center space-x-1.5">
+                            <input type="text" id="test-filter-prefix" oninput="updateFullTagPreview(); saveFilterPrefix();" placeholder="Prefix (e.g. 719HF0010)" class="w-2/3 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase font-semibold text-slate-700">
+                            <input type="text" id="test-filter-suffix" oninput="updateFullTagPreview()" placeholder="No. (001)" class="w-1/3 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase font-semibold text-slate-800">
+                        </div>
+                        <div class="text-[11px] text-slate-400 font-mono italic">
+                            Full Tag: <span id="full-tag-preview" class="font-bold text-sky-700">---</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Room / Location</label>
+                        <input type="text" id="test-room" placeholder="e.g. Cleanroom 101" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">AHU System</label>
+                        <input type="text" id="test-ahu" placeholder="e.g. AHU-02" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Filter Size</label>
+                        <input type="text" id="test-size" placeholder="e.g. 610x610x150" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pressure Drop (Pa) <span class="text-red-500">*</span></label>
+                        <input type="number" id="test-pressure-drop" step="0.1" placeholder="e.g. 125.0" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Air Velocity (m/s) <span class="text-red-500">*</span></label>
+                        <input type="number" id="test-velocity" step="0.01" placeholder="e.g. 0.45" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Direction <span class="text-red-500">*</span></label>
+                        <select id="test-direction" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none font-medium">
+                            <option value="">Select Velocity Location.</option>
+                            <option value="NW (North West)">NW (North West)</option>
+                            <option value="NE (North East)">NE (North East)</option>
+                            <option value="SW (South West)">SW (South West)</option>
+                            <option value="SE (South East)">SE (South East)</option>
+                            <option value="N (North)">N (North)</option>
+                            <option value="S (South)">S (South)</option>
+                            <option value="W (West)">W (West)</option>
+                            <option value="E (East)">E (East)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- MIDDLE SECTION: Collapsible Filter Interactive Diagram Accordion -->
+                <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none" onclick="toggleCanvasAccordion()">
+                        <div class="flex items-center space-x-3">
+                            <i id="canvas-chevron" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
+                            <span class="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wider">Filter Face Interactive Visual Scan Canvas</span>
+                            <span id="marker-badge" class="bg-red-500 text-white text-[11px] px-2 py-0.5 rounded-full font-bold">0 Leaks</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[11px] font-semibold text-sky-700 bg-sky-100 border border-sky-200 px-2 py-0.5 rounded">
+                                Access: Filter Face
+                            </span>
+                        </div>
+                    </div>
+
+                    <div id="canvas-accordion-body" class="p-4 sm:p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
+                            <!-- Controls -->
+                            <div class="flex items-center space-x-3 w-full sm:w-auto">
+                                <label class="text-xs font-bold text-slate-600 uppercase whitespace-nowrap">Filter Shape:</label>
+                                <select id="canvas-aspect-ratio" onchange="updateCanvasShape()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                                    <option value="1:1">Square (1:1)</option>
+                                    <option value="1:2">Vertical Aspect (1:2)</option>
+                                    <option value="2:1">Horizontal Aspect (2:1)</option>
+                                </select>
+                            </div>
+
+                            <div class="flex items-center space-x-4 text-xs font-medium">
+                                <div class="flex items-center space-x-1.5">
+                                    <span class="w-3 h-3 rounded-full bg-amber-400 border border-amber-600 inline-block"></span>
+                                    <span class="text-slate-600">Outer Gasket Zone</span>
+                                </div>
+                                <div class="flex items-center space-x-1.5">
+                                    <span class="w-3 h-3 rounded-full bg-sky-200 border border-sky-500 inline-block"></span>
+                                    <span class="text-slate-600">Inner Media Zone</span>
+                                </div>
+                            </div>
+
+                            <button onclick="clearCanvasMarkers()" class="w-full sm:w-auto text-xs bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-semibold transition flex items-center justify-center space-x-1 shadow-sm">
+                                <i class="fa-solid fa-eraser"></i>
+                                <span>Clear Markers</span>
+                            </button>
+                        </div>
+
+                        <!-- Canvas Display Area -->
+                        <div class="flex justify-center items-center py-2">
+                            <div id="canvas-wrapper" class="relative max-w-full bg-white shadow-inner rounded-lg border border-slate-300 p-2">
+                                <div class="absolute top-3 left-3 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow z-10 tracking-widest">
+                                    NORTH ^
+                                </div>
+                                <canvas id="leak-canvas" class="cursor-crosshair rounded border border-slate-200 block"></canvas>
+                            </div>
+                        </div>
+                        <p class="text-center text-[11px] text-slate-500 italic">Tap or click canvas to plot defect coordinate. Points in amber border trigger automatic Gasket leak note. Points inside blue zone trigger Media leak note.</p>
+                    </div>
+                </div>
+
+                <!-- BOTTOM SECTION: Test Status, Efficiency, Notes -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <!-- Column 1: Test Status -->
+                    <div class="space-y-3">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Test Result Status <span class="text-red-500">*</span></label>
+                        <div class="space-y-2">
+                            <label class="flex items-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50/50 cursor-pointer transition">
+                                <input type="radio" name="test-status" value="NLD" onchange="handleStatusChange()" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                                <div class="ml-3">
+                                    <span class="block text-xs font-bold text-slate-800">NLD (No Leak Detected)</span>
+                                    <span class="block text-[11px] text-slate-500">Compliant - Zero leak threshold exceeded</span>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50/50 cursor-pointer transition">
+                                <input type="radio" name="test-status" value="NLDAR" onchange="handleStatusChange()" class="w-4 h-4 text-amber-600 focus:ring-amber-500">
+                                <div class="ml-3">
+                                    <span class="block text-xs font-bold text-slate-800">NLDAR (No Leak Detected After Repair)</span>
+                                    <span class="block text-[11px] text-slate-500">Compliant - Repaired & re-tested</span>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-red-50/50 cursor-pointer transition">
+                                <input type="radio" name="test-status" value="LDNR" onchange="handleStatusChange()" class="w-4 h-4 text-red-600 focus:ring-red-500">
+                                <div class="ml-3">
+                                    <span class="block text-xs font-bold text-slate-800">LDNR (Leak Detected Not Repaired)</span>
+                                    <span class="block text-[11px] text-slate-500">Non-Compliant - Filter replacement required</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: % Efficiency & Scratchpad -->
+                    <div class="space-y-3">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Filtered Efficiency & Leak Calculation</label>
+                        
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency Rating <span id="efficiency-required-star" class="text-red-500 hidden">*</span></label>
+                            <input type="text" id="test-efficiency" value="No leakage detected" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 cursor-not-allowed" readonly>
+                        </div>
+
+                        <!-- Penetration Calculator Scratchpad Helper Block -->
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-600"><i class="fa-solid fa-calculator text-sky-600 mr-1"></i>Penetration Calculator</span>
+                                <span class="text-[10px] text-slate-400">Helper Tool Only</span>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-medium block">Downstream Penetration (%)</label>
+                                <input type="number" id="scratch-penetration" oninput="calculateScratchpad()" step="0.001" placeholder="e.g. 0.005" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-semibold text-slate-800">
+                            </div>
+                            <div class="pt-1 flex justify-between items-center text-xs border-t border-slate-200/60">
+                                <span class="text-slate-500">Calculated Efficiency: <strong id="scratch-calc-eff" class="text-slate-700">100.0000%</strong></span>
+                                <button type="button" onclick="applyScratchpadToEfficiency()" class="text-[11px] text-sky-600 hover:text-sky-800 font-bold">Apply Efficiency →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Inspection Notes -->
+                    <div class="space-y-3">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Inspection & Repair Notes</label>
+                        <textarea id="test-notes" rows="6" placeholder="Defect locations, sealing notes, or repair methodologies..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Form Action Buttons -->
+                <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <button type="button" onclick="confirmResetForm()" class="w-full sm:w-auto text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-lg font-medium transition">
+                        <i class="fa-solid fa-rotate-left mr-1.5"></i>Reset Form
+                    </button>
+
+                    <div class="flex items-center space-x-3 w-full sm:w-auto">
+                        <button type="button" onclick="submitFilterTestRecord()" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-700 text-white text-sm px-6 py-2.5 rounded-lg font-semibold shadow-md transition flex items-center justify-center">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i>
+                            <span id="btn-submit-text">Commit Test Record</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================= TAB 2: EQUIPMENT CALIBRATION VAULT ================= -->
+        <div id="tab-content-calibration" class="hidden space-y-6">
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-6">
+                <div class="flex justify-between items-center pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-sky-600 mr-2"></i>Equipment Calibration Master Vault</h2>
+                        <p class="text-xs text-slate-500">Register and manage standards, calibration dates, and MTM inventory tracking.</p>
+                    </div>
+                </div>
+
+                <!-- Add Equipment Form -->
+                <form id="equip-form" onsubmit="handleSaveEquipment(event)" class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider" id="equip-form-title">Register / Update Instrument</h3>
+                    <input type="hidden" id="equip-edit-id">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Equipment Category <span class="text-red-500">*</span></label>
+                            <select id="equip-category" required class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                                <option value="">Select Category...</option>
+                                <option value="Photometer">Photometer</option>
+                                <option value="Anemometer">Anemometer</option>
+                                <option value="Manometer (Micrometer)">Manometer (Micrometer)</option>
+                                <option value="Gauge">Gauge</option>
+                                <option value="Generator">Generator</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">MTM ID <span class="text-red-500">*</span></label>
+                            <input type="text" id="equip-mtm" required placeholder="e.g. MTM-409" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Serial Number <span class="text-red-500">*</span></label>
+                            <input type="text" id="equip-serial" required placeholder="e.g. SN-998231" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Calibration Date <span class="text-red-500">*</span></label>
+                            <input type="date" id="equip-cal-date" required onchange="autoCalculateCalDue()" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Calibration Due Date (+1 Year)</label>
+                            <input type="text" id="equip-due-date" readonly class="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Certificate Number <span class="text-red-500">*</span></label>
+                            <input type="text" id="equip-cert" required placeholder="e.g. CERT-2026-901" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 pt-2">
+                        <button type="button" onclick="resetEquipForm()" class="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">Cancel / Clear</button>
+                        <button type="submit" class="px-5 py-2 text-xs bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-lg shadow-sm transition">Save Instrument to Vault</button>
+                    </div>
+                </form>
+
+                <!-- Equipment Master Inventory Table -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Registered Master Instruments</h3>
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3">Category</th>
+                                    <th class="p-3">MTM ID</th>
+                                    <th class="p-3">Serial No</th>
+                                    <th class="p-3">Cal Date</th>
+                                    <th class="p-3">Cal Due</th>
+                                    <th class="p-3">Cert #</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="equip-table-body" class="divide-y divide-slate-100 text-slate-700">
+                                <!-- Dynamic Equipment Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================= TAB 3: RECORDS & EXPORT VAULT ================= -->
+        <div id="tab-content-records" class="hidden space-y-6">
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-100 gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-database text-sky-600 mr-2"></i>Completed Test Records Vault</h2>
+                        <p class="text-xs text-slate-500">View, edit, export, or save/load JSON sessions.</p>
+                    </div>
+
+                    <!-- Export & Backup Action Buttons -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="saveJSONBackup()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-lg font-semibold shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-floppy-disk mr-1.5 text-sm"></i>Save JSON Backup
+                        </button>
+                        <button onclick="triggerLoadJSON()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3.5 py-2 rounded-lg font-semibold shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-file-import mr-1.5 text-sm"></i>Load JSON Backup
+                        </button>
+                        <input type="file" id="json-file-input" accept=".json" class="hidden" onchange="handleJSONFileImport(event)">
+
+                        <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 rounded-lg font-semibold shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-file-csv mr-1.5 text-sm"></i>Export CSV
+                        </button>
+                        <button onclick="exportPDF()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs px-3.5 py-2 rounded-lg font-semibold shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-file-pdf mr-1.5 text-sm"></i>Generate PDF Report
+                        </button>
+                        <button onclick="confirmWipeSession()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs px-3 py-2 rounded-lg font-semibold transition flex items-center">
+                            <i class="fa-solid fa-trash-can mr-1.5"></i>Session Wipe
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Records Table -->
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-3">Date</th>
+                                <th class="p-3">Filter Tag</th>
+                                <th class="p-3">Room / AHU</th>
+                                <th class="p-3">Pressure Drop</th>
+                                <th class="p-3">Velocity</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Efficiency</th>
+                                <th class="p-3">Leaks</th>
+                                <th class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="records-table-body" class="divide-y divide-slate-100 text-slate-700">
+                            <!-- Injected Records -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal Dialogs Container -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        
+        <!-- Modal: Duplicate Tag Collision -->
+        <div id="modal-duplicate" class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 hidden">
+            <div class="flex items-center space-x-3 text-amber-600">
+                <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                <h3 class="font-bold text-slate-800 text-base">Duplicate Filter Tag Detected</h3>
+            </div>
+            <p class="text-xs text-slate-600">
+                Filter Tag <strong id="modal-dup-tag" class="text-slate-800"></strong> already exists in current test vault session.
+            </p>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="resolveDuplicate('add')" class="px-3.5 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold">Add Duplicate</button>
+                <button onclick="resolveDuplicate('overwrite')" class="px-3.5 py-2 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold">Overwrite Existing</button>
+            </div>
+        </div>
+
+        <!-- Modal: NLD Active Markers Conflict -->
+        <div id="modal-nld-conflict" class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 hidden">
+            <div class="flex items-center space-x-3 text-red-600">
+                <i class="fa-solid fa-circle-exclamation text-2xl"></i>
+                <h3 class="font-bold text-slate-800 text-base">Inconsistent NLD Status</h3>
+            </div>
+            <p class="text-xs text-slate-600">
+                You selected <strong>NLD (No Leak Detected)</strong>, but the visual canvas currently contains active leak markers.
+            </p>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal()" class="px-3.5 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold">Review & Correct</button>
+                <button onclick="forceNLDSubmit()" class="px-3.5 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Clear Markers & Save NLD</button>
+            </div>
+        </div>
+
+        <!-- Modal: Form Reset Confirmation -->
+        <div id="modal-reset-confirm" class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 hidden">
+            <div class="flex items-center space-x-3 text-slate-700">
+                <i class="fa-solid fa-arrow-rotate-left text-2xl text-sky-600"></i>
+                <h3 class="font-bold text-slate-800 text-base">Reset Testing Form?</h3>
+            </div>
+            <p class="text-xs text-slate-600">
+                This will clear test metrics, notes, and visual canvas defect coordinates.
+            </p>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal()" class="px-3 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold">Cancel</button>
+                <button onclick="executeFormReset()" class="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Reset Form</button>
+            </div>
+        </div>
+
+        <!-- Modal: Session Wipe Safeguard -->
+        <div id="modal-wipe-confirm" class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4 hidden">
+            <div class="flex items-center space-x-3 text-red-600">
+                <i class="fa-solid fa-radiation text-2xl"></i>
+                <h3 class="font-bold text-slate-800 text-base">Confirm Full Session Wipe</h3>
+            </div>
+            <p class="text-xs text-slate-600">
+                This will permanently delete all logged filter test records from local vault storage. An automatic PDF/CSV backup will be generated prior to wipe.
+            </p>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeModal()" class="px-3 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold">Cancel</button>
+                <button onclick="executeSessionWipe()" class="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Backup & Wipe Vault</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Script Engine -->
+    <script>
+        const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        
+        function formatGMPDate(dateObj) {
+            const d = new Date(dateObj);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = MONTHS[d.getMonth()];
+            const year = d.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function parseGMPDateToISO(gmpStr) {
+            if (!gmpStr || typeof gmpStr !== 'string') return '';
+            const parts = gmpStr.trim().split('/');
+            if (parts.length !== 3) return '';
+            const day = parts[0].padStart(2, '0');
+            const monthIdx = MONTHS.indexOf(parts[1].toUpperCase());
+            const year = parts[2];
+            if (monthIdx === -1) return '';
+            const month = String(monthIdx + 1).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function parseGMPDate(gmpStr) {
+            const iso = parseGMPDateToISO(gmpStr);
+            if (!iso) return null;
+            const [y, m, d] = iso.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+
+        function isCalibrationExpired(dueGmp) {
+            const due = parseGMPDate(dueGmp);
+            if (!due) return true;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return due < today;
+        }
+
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escapeCsvField(val) {
+            let s = val == null ? '' : String(val);
+            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+            s = s.replace(/"/g, '""');
+            return `"${s}"`;
+        }
+
+        const TODAY_GMP = formatGMPDate(new Date());
+
+        const EQUIP_CATEGORIES = [
+            "Photometer",
+            "Anemometer",
+            "Manometer (Micrometer)",
+            "Gauge",
+            "Generator"
+        ];
+
+        let state = {
+            setupLocked: false,
+            setupCollapsed: false,
+            canvasCollapsed: false,
+            testerInitials: "",
+            filterPrefix: "",
+            equipmentMaster: [],
+            dailyEquipment: {},
+            records: [],
+            jobSchedule: [], // Imported job CSV filter schedule
+            jobScheduleMeta: null,
+            editingRecordId: null,
+            canvasShape: "1:1",
+            canvasMarkers: []
+        };
+
+        function loadState() {
+            const savedEquip = localStorage.getItem('hepa_equip_master');
+            if (savedEquip) {
+                state.equipmentMaster = JSON.parse(savedEquip);
+            } else {
+                const nextYear = new Date();
+                nextYear.setFullYear(nextYear.getFullYear() + 1);
+                const defaultCalDate = new Date();
+
+                state.equipmentMaster = [
+                    { id: '1', category: 'Photometer', mtm: 'MTM-101', serial: 'PH-88392', calDate: formatGMPDate(defaultCalDate), due: formatGMPDate(nextYear), cert: 'CERT-PH-01' },
+                    { id: '2', category: 'Anemometer', mtm: 'MTM-202', serial: 'AN-99210', calDate: formatGMPDate(defaultCalDate), due: formatGMPDate(nextYear), cert: 'CERT-AN-02' },
+                    { id: '3', category: 'Manometer (Micrometer)', mtm: 'MTM-303', serial: 'MN-11029', calDate: formatGMPDate(defaultCalDate), due: formatGMPDate(nextYear), cert: 'CERT-MN-03' },
+                    { id: '4', category: 'Gauge', mtm: 'MTM-404', serial: 'GG-77218', calDate: formatGMPDate(defaultCalDate), due: formatGMPDate(nextYear), cert: 'CERT-GG-04' },
+                    { id: '5', category: 'Generator', mtm: 'MTM-505', serial: 'GN-44102', calDate: formatGMPDate(defaultCalDate), due: formatGMPDate(nextYear), cert: 'CERT-GN-05' }
+                ];
+                saveEquipMaster();
+            }
+
+            const savedRecords = localStorage.getItem('hepa_test_records');
+            if (savedRecords) state.records = JSON.parse(savedRecords);
+
+            const savedInitials = localStorage.getItem('hepa_tester_initials');
+            if (savedInitials) state.testerInitials = savedInitials;
+
+            const savedPrefix = localStorage.getItem('hepa_filter_prefix');
+            if (savedPrefix) state.filterPrefix = savedPrefix;
+
+            try {
+                const savedSchedule = JSON.parse(localStorage.getItem('hepa_job_schedule') || '[]');
+                if (Array.isArray(savedSchedule)) state.jobSchedule = savedSchedule.map(sanitizeScheduleItem).filter(Boolean);
+                const savedMeta = JSON.parse(localStorage.getItem('hepa_job_schedule_meta') || 'null');
+                if (savedMeta && typeof savedMeta === 'object') state.jobScheduleMeta = savedMeta;
+            } catch (e) { state.jobSchedule = []; }
+        }
+
+        function saveEquipMaster() { localStorage.setItem('hepa_equip_master', JSON.stringify(state.equipmentMaster)); }
+        function saveRecords() { localStorage.setItem('hepa_test_records', JSON.stringify(state.records)); updateVaultBadge(); }
+        function saveTesterInitials() { localStorage.setItem('hepa_tester_initials', state.testerInitials); }
+        function saveFilterPrefix() {
+            const prefix = document.getElementById('test-filter-prefix').value.trim().toUpperCase();
+            state.filterPrefix = prefix;
+            localStorage.setItem('hepa_filter_prefix', prefix);
+        }
+
+        function getFullFilterTag() {
+            const prefix = document.getElementById('test-filter-prefix').value.trim().toUpperCase();
+            const suffix = document.getElementById('test-filter-suffix').value.trim().toUpperCase();
+            if (prefix && suffix) return `${prefix}${suffix}`;
+            return prefix || suffix || '';
+        }
+
+        function updateFullTagPreview() {
+            const fullTag = getFullFilterTag();
+            document.getElementById('full-tag-preview').textContent = fullTag || '---';
+        }
+
+        // --- JOB SCHEDULE CSV UPLOAD & PARSER ---
+        const SCHEDULE_ASPECTS = ['1:1', '1:2', '2:1'];
+        let scheduleImportSeq = 0;
+
+        function normHeader(h) { return String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+        // Handles UTF-8 (with/without BOM), UTF-16 (Excel "Unicode Text") and Windows-1252 (older Excel on Windows/Mac)
+        function decodeCsvBuffer(buf) {
+            const b = new Uint8Array(buf);
+            if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+            if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+            if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+            try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+            catch (e) { return new TextDecoder('windows-1252').decode(b); }
+        }
+
+        function sniffDelimiter(text) {
+            const counts = { ',': 0, ';': 0, '\t': 0 };
+            let inQ = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (c === '"') inQ = !inQ;
+                else if (!inQ) {
+                    if (c === '\n' || c === '\r') break;
+                    if (c in counts) counts[c]++;
+                }
+            }
+            const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+            return counts[best] > 0 ? best : ',';
+        }
+
+        // Proper CSV parser: quotes, "" escapes, embedded commas/newlines, and ANY line ending (\r\n, \n, or bare \r)
+        function parseCSVText(text) {
+            const delim = sniffDelimiter(text);
+            const rows = []; let row = [], field = '', inQ = false, i = 0;
+            while (i < text.length) {
+                const c = text[i];
+                if (inQ) {
+                    if (c === '"') {
+                        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+                        inQ = false; i++; continue;
+                    }
+                    field += c; i++; continue;
+                }
+                if (c === '"' && field === '') { inQ = true; i++; continue; }
+                if (c === delim) { row.push(field); field = ''; i++; continue; }
+                if (c === '\r' || c === '\n') {
+                    if (c === '\r' && text[i + 1] === '\n') i++;
+                    row.push(field); field = ''; rows.push(row); row = []; i++; continue;
+                }
+                field += c; i++;
+            }
+            if (field !== '' || row.length) { row.push(field); rows.push(row); }
+            return { rows, delim };
+        }
+
+        function mapScheduleColumns(headers) {
+            const norm = headers.map(normHeader);
+            const find = (exact, partial) => {
+                let i = norm.findIndex(h => exact.includes(h));
+                if (i === -1 && partial) i = norm.findIndex(h => partial.some(p => h.includes(p)));
+                return i;
+            };
+            return {
+                tag: find(['filterid', 'filtertag', 'filterno', 'filternumber', 'filterref', 'tagid', 'tagno', 'tag', 'id']),
+                type: find(['filtertype', 'type']),
+                room: find(['room', 'roomno', 'roomnumber', 'location'], ['room', 'location']),
+                area: find(['area', 'facility', 'building']),
+                job: find(['job', 'module', 'project', 'jobno']),
+                size: find(['size', 'filtersize', 'dimensions', 'dimension'], ['size', 'dimension']),
+                aspect: find(['aspectratio', 'aspect', 'ratio']),
+                ahu: find(['ahu', 'ahuno', 'ahunumber', 'ahusystem', 'system'], ['ahu', 'system'])
+            };
+        }
+
+        function validAspect(a) {
+            const s = String(a == null ? '' : a).trim().replace(/\s+/g, '').replace(/[x\/]/gi, ':');
+            return SCHEDULE_ASPECTS.includes(s) ? s : '';
+        }
+        // Derives the diagram shape from "528 x 528 x 117 mm" when the CSV has no usable aspect column
+        function aspectFromSize(size) {
+            const m = /(\d+(?:\.\d+)?)\s*[x\u00d7*]\s*(\d+(?:\.\d+)?)/i.exec(String(size || ''));
+            if (!m) return '1:1';
+            const ratio = parseFloat(m[1]) / parseFloat(m[2]);
+            if (ratio >= 1.5) return '2:1';
+            if (ratio <= 1 / 1.5) return '1:2';
+            return '1:1';
+        }
+        function sanitizeScheduleItem(s) {
+            if (!s || typeof s !== 'object') return null;
+            const t = v => String(v == null ? '' : v).trim();
+            const filterTag = t(s.filterTag).toUpperCase();
+            if (!filterTag) return null;
+            const size = t(s.size);
+            return { filterTag, room: t(s.room), ahu: t(s.ahu), size, type: t(s.type), area: t(s.area), job: t(s.job), aspect: validAspect(s.aspect) || aspectFromSize(size) };
+        }
+        function persistSchedule() {
+            try {
+                localStorage.setItem('hepa_job_schedule', JSON.stringify(state.jobSchedule));
+                if (state.jobScheduleMeta) localStorage.setItem('hepa_job_schedule_meta', JSON.stringify(state.jobScheduleMeta));
+                else localStorage.removeItem('hepa_job_schedule_meta');
+                return true;
+            } catch (e) {
+                alert('The schedule could not be saved to browser storage (it is loaded for this session only).');
+                return false;
+            }
+        }
+        function testedMap() {
+            const m = new Map();
+            state.records.forEach(r => { if (!m.has(r.filterTag)) m.set(r.filterTag, r); });
+            return m;
+        }
+
+function handleJobCSVImport(e) {
+            const input = e.target;
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onerror = function () { alert('The file could not be read.'); };
+            reader.onload = function (evt) {
+                try {
+                    const text = decodeCsvBuffer(evt.target.result);
+                    if (/[\u0000-\u0008\u000E-\u001F]/.test(text)) {
+                        alert('This does not look like a CSV text file (it contains binary data). Export the schedule from Excel as "CSV" and try again.');
+                        return;
+                    }
+                    const { rows } = parseCSVText(text);
+                    const data = rows.filter(r => r.some(c => String(c).trim() !== ''));
+                    if (data.length < 2) {
+                        alert('No data rows found. The file needs a header row plus at least one filter row.');
+                        return;
+                    }
+
+                    const headers = data[0].map(h => String(h).trim());
+                    const map = mapScheduleColumns(headers);
+                    let tagFallback = false;
+                    if (map.tag === -1) {
+                        if (!confirm(`No "Filter ID" column was recognised.\n\nColumns found: ${headers.join(', ')}\n\nUse the first column ("${headers[0]}") as the Filter ID?`)) return;
+                        map.tag = 0; tagFallback = true;
+                    }
+
+                    const items = [], seen = new Set(), dupes = [];
+                    let blankTag = 0, aspectMismatch = 0;
+                    for (let r = 1; r < data.length; r++) {
+                        const cols = data[r];
+                        const get = i => (i >= 0 && i < cols.length) ? String(cols[i]).trim() : '';
+                        const tag = get(map.tag).toUpperCase();
+                        if (!tag) { blankTag++; continue; }
+                        if (seen.has(tag)) { dupes.push(tag); continue; }
+                        seen.add(tag);
+                        const size = get(map.size), aspectCsv = validAspect(get(map.aspect));
+                        if (aspectCsv && size && aspectCsv !== aspectFromSize(size)) aspectMismatch++;
+                        items.push(sanitizeScheduleItem({
+                            filterTag: tag, room: get(map.room), ahu: get(map.ahu), size,
+                            type: get(map.type), area: get(map.area), job: get(map.job), aspect: aspectCsv
+                        }));
+                    }
+
+                    if (items.length === 0) {
+                        alert('No filters could be read: every row had an empty Filter ID.');
+                        return;
+                    }
+                    if (state.jobSchedule.length > 0 &&
+                        !confirm(`Replace the current schedule (${state.jobSchedule.length} filters) with this file (${items.length} filters)?\n\nYour recorded test results are not affected.`)) {
+                        return;
+                    }
+
+                    state.jobSchedule = items;
+                    state.jobScheduleMeta = { file: file.name, loaded: formatGMPDate(new Date()) };
+                    persistSchedule();
+                    renderScheduleSelector();
+
+                    const names = { tag: 'Filter ID', type: 'Filter Type', room: 'Room', area: 'Area', job: 'Job', size: 'Size', aspect: 'Aspect Ratio', ahu: 'AHU' };
+                    const found = Object.keys(names).filter(k => map[k] !== -1 && !(k === 'tag' && tagFallback)).map(k => `${names[k]} ("${headers[map[k]]}")`);
+                    const missing = Object.keys(names).filter(k => map[k] === -1).map(k => names[k]);
+                    const already = items.filter(it => testedMap().has(it.filterTag)).length;
+
+                    let msg = `Imported ${items.length} filters from "${file.name}".\n\nColumns used: ${found.join(', ') || 'none'}.`;
+                    if (tagFallback) msg += `\nNo Filter ID column was recognised, so the FIRST column ("${headers[0]}") was used as the Filter ID.`;
+                    if (missing.length) msg += `\nNot found (left blank): ${missing.join(', ')}.`;
+                    if (blankTag || dupes.length) msg += `\nSkipped: ${blankTag} row(s) with no Filter ID, ${dupes.length} duplicate ID(s)${dupes.length ? ' (' + dupes.slice(0, 5).join(', ') + (dupes.length > 5 ? ', ...' : '') + ')' : ''}.`;
+                    if (aspectMismatch) msg += `\nNote: ${aspectMismatch} row(s) have an Aspect Ratio that disagrees with their Size - the Aspect Ratio column was used.`;
+                    if (already) msg += `\n${already} of these filters already have a test record in the vault.`;
+                    alert(msg);
+                } catch (err) {
+                    alert('Error reading CSV schedule: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            input.value = '';
+        }
+
+function renderScheduleSelector() {
+            const container = document.getElementById('schedule-search-container');
+            const select = document.getElementById('schedule-filter-select');
+            const statusText = document.getElementById('schedule-status-text');
+            const clearBtn = document.getElementById('btn-clear-schedule');
+            const n = state.jobSchedule.length;
+
+            if (n === 0) {
+                container.classList.add('hidden');
+                clearBtn.classList.add('hidden');
+                statusText.textContent = 'No job schedule loaded. Upload a CSV with a Filter ID column (Room, AHU, Size, Aspect Ratio optional).';
+                return;
+            }
+
+            const tested = testedMap();
+            const ahuSel = document.getElementById('schedule-ahu-filter');
+            const ahus = [...new Set(state.jobSchedule.map(s => s.ahu).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            const curAhu = ahuSel.value;
+            ahuSel.innerHTML = '<option value="">All AHUs</option>' + ahus.map(a => `<option value="${escapeHtml(a)}">AHU ${escapeHtml(a)}</option>`).join('');
+            ahuSel.value = ahus.includes(curAhu) ? curAhu : '';
+
+            const q = document.getElementById('schedule-search').value.trim().toUpperCase();
+            const ahuF = ahuSel.value;
+            const hideTested = document.getElementById('schedule-hide-tested').checked;
+
+            let shown = 0, testedCount = 0;
+            const opts = [];
+            state.jobSchedule.forEach((s, idx) => {
+                const done = tested.has(s.filterTag);
+                if (done) testedCount++;
+                if (ahuF && s.ahu !== ahuF) return;
+                if (hideTested && done) return;
+                if (q && !`${s.filterTag} ${s.room} ${s.ahu}`.toUpperCase().includes(q)) return;
+                shown++;
+                opts.push(`<option value="${idx}">${done ? '\u2713 ' : ''}${escapeHtml(s.filterTag)} | Room ${escapeHtml(s.room || '-')} | AHU ${escapeHtml(s.ahu || '-')} | ${escapeHtml(s.size || '-')}</option>`);
+            });
+
+            container.classList.remove('hidden');
+            clearBtn.classList.remove('hidden');
+            select.innerHTML = '<option value="">-- Choose filter from uploaded schedule --</option>' + opts.join('');
+            select.value = '';
+
+            const rooms = new Set(state.jobSchedule.map(s => s.room).filter(Boolean)).size;
+            const fileTxt = state.jobScheduleMeta && state.jobScheduleMeta.file ? ` \u00b7 "${state.jobScheduleMeta.file}"` : '';
+            statusText.textContent = `${n} filters loaded \u00b7 ${rooms} rooms \u00b7 ${ahus.length} AHUs${fileTxt}`;
+            document.getElementById('schedule-count-text').textContent =
+                `Showing ${shown} of ${n} \u00b7 ${testedCount} tested \u00b7 ${n - testedCount} remaining` + (opts.length === 0 ? ' \u2014 nothing matches the current search/filters' : '');
+        }
+
+        function selectNextUntested() {
+            if (state.jobSchedule.length === 0) return;
+            const tested = testedMap();
+            const ahuF = document.getElementById('schedule-ahu-filter').value;
+            const n = state.jobSchedule.length;
+            const cur = getFullFilterTag();
+            const from = state.jobSchedule.findIndex(s => s.filterTag === cur) + 1; // 0 if nothing selected
+            for (let k = 0; k < n; k++) {
+                const idx = (from + k) % n;
+                const s = state.jobSchedule[idx];
+                if (ahuF && s.ahu !== ahuF) continue;
+                if (tested.has(s.filterTag)) continue;
+                const sel = document.getElementById('schedule-filter-select');
+                if (sel.querySelector(`option[value="${idx}"]`)) sel.value = String(idx);
+                onSelectScheduleFilter(String(idx));
+                return;
+            }
+            alert(ahuF ? `Every filter on AHU ${ahuF} already has a test record.` : 'Every filter in the schedule already has a test record.');
+        }
+
+function onSelectScheduleFilter(indexVal) {
+            const meta = document.getElementById('selected-schedule-meta');
+            if (indexVal === '' || indexVal == null) { meta.classList.add('hidden'); return; }
+
+            const item = state.jobSchedule[parseInt(indexVal, 10)];
+            if (!item) return;
+
+            if (state.editingRecordId && !confirm('You are editing a committed record. Loading a filter from the schedule will replace its tag, room, AHU and size. Continue?')) {
+                document.getElementById('schedule-filter-select').value = '';
+                return;
+            }
+
+            // The scheduled tag goes in as the WHOLE tag (prefix box); the saved working prefix is left alone.
+            document.getElementById('test-filter-prefix').value = item.filterTag;
+            document.getElementById('test-filter-suffix').value = '';
+            updateFullTagPreview();
+
+            document.getElementById('test-room').value = item.room || '';
+            document.getElementById('test-ahu').value = item.ahu || '';
+            document.getElementById('test-size').value = item.size || '';
+
+            // Diagram shape follows the filter (e.g. 610 x 305 -> horizontal 2:1)
+            const aspectSel = document.getElementById('canvas-aspect-ratio');
+            if (item.aspect && aspectSel.value !== item.aspect) { aspectSel.value = item.aspect; updateCanvasShape(); }
+
+            document.getElementById('meta-room').textContent = item.room || '-';
+            document.getElementById('meta-ahu').textContent = item.ahu || '-';
+            document.getElementById('meta-size').textContent = item.size || '-';
+            document.getElementById('meta-aspect').textContent = item.aspect || '-';
+            document.getElementById('meta-extra').textContent = [item.type, item.area, item.job].filter(Boolean).join(' \u00b7 ');
+            const prev = testedMap().get(item.filterTag);
+            document.getElementById('meta-warn').textContent = prev
+                ? `\u26a0 Already recorded on ${prev.date} (${prev.status}). Saving will ask whether to overwrite or add a duplicate.` : '';
+            meta.classList.remove('hidden');
+        }
+
+function clearJobSchedule() {
+            if (confirm('Clear the uploaded job schedule? (Recorded test results are not affected.)')) {
+                state.jobSchedule = [];
+                state.jobScheduleMeta = null;
+                persistSchedule();
+                document.getElementById('selected-schedule-meta').classList.add('hidden');
+                renderScheduleSelector();
+            }
+        }
+
+        // --- JSON BACKUP & RESTORE ---
+        function saveJSONBackup() {
+            if (state.records.length === 0 && state.equipmentMaster.length === 0) {
+                alert("No data available in vault to save.");
+                return;
+            }
+
+            const exportData = {
+                version: "2.1",
+                exportDate: TODAY_GMP,
+                testerInitials: state.testerInitials,
+                filterPrefix: state.filterPrefix,
+                equipmentMaster: state.equipmentMaster,
+                dailyEquipment: state.dailyEquipment,
+                jobSchedule: state.jobSchedule,
+                jobScheduleMeta: state.jobScheduleMeta,
+                records: state.records
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `HEPA_Vault_Backup_${TODAY_GMP.replace(/\//g, '-')}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function triggerLoadJSON() { document.getElementById('json-file-input').click(); }
+
+        function handleJSONFileImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const imported = JSON.parse(evt.target.result);
+                    if (imported.records) state.records = imported.records;
+                    if (imported.equipmentMaster) state.equipmentMaster = imported.equipmentMaster;
+                    if (Array.isArray(imported.jobSchedule)) {
+                        state.jobSchedule = imported.jobSchedule.map(sanitizeScheduleItem).filter(Boolean);
+                        state.jobScheduleMeta = imported.jobScheduleMeta && typeof imported.jobScheduleMeta === 'object' ? imported.jobScheduleMeta : null;
+                        persistSchedule();
+                    }
+                    if (imported.testerInitials) {
+                        state.testerInitials = imported.testerInitials;
+                        document.getElementById('setup-tester-initials').value = state.testerInitials;
+                    }
+
+                    saveRecords();
+                    saveEquipMaster();
+                    renderEquipmentTable();
+                    renderEquipmentSetupRows();
+                    renderRecordsTable();
+                    renderScheduleSelector();
+
+                    alert("Backup loaded successfully.");
+                } catch (err) {
+                    alert("Import failed: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        }
+
+        // --- DOM INITIALIZATION ---
+        window.onload = function() {
+            loadState();
+            document.getElementById('setup-test-date').value = TODAY_GMP;
+            document.getElementById('setup-tester-initials').value = state.testerInitials;
+            document.getElementById('test-filter-prefix').value = state.filterPrefix;
+            
+            updateFullTagPreview();
+            renderEquipmentSetupRows();
+            renderEquipmentTable();
+            renderRecordsTable();
+            renderScheduleSelector();
+            initCanvas();
+            updateVaultBadge();
+        };
+
+        function switchTab(tabKey) {
+            ['testing', 'calibration', 'records'].forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabKey) {
+                    content.classList.remove('hidden');
+                    btn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-sky-600 text-white shadow-sm";
+                } else {
+                    content.classList.add('hidden');
+                    btn.className = "px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-700/50";
+                }
+            });
+            if (tabKey === 'testing') setTimeout(drawCanvas, 50);
+        }
+
+function updateVaultBadge() {
+            document.getElementById('vault-count-badge').textContent = state.records.length;
+            renderScheduleSelector(); // tested/remaining counts follow the vault
+        }
+
+        // --- DAILY SETUP BANNER & VERIFICATION ---
+        function renderEquipmentSetupRows() {
+            const container = document.getElementById('equipment-setup-rows');
+            container.innerHTML = '';
+
+            EQUIP_CATEGORIES.forEach((cat) => {
+                const matchedList = state.equipmentMaster.filter(e => e.category === cat);
+                let optionsHtml = `<option value="">Select MTM...</option>`;
+                matchedList.forEach(m => {
+                    const selected = (state.dailyEquipment[cat] && state.dailyEquipment[cat].mtm === m.mtm) ? 'selected' : '';
+                    optionsHtml += `<option value="${m.mtm}" ${selected}>${m.mtm} (${m.serial})</option>`;
+                });
+
+                const currentEq = state.dailyEquipment[cat];
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2";
+                div.innerHTML = `
+                    <span class="text-[11px] font-bold text-slate-700 block">${cat}</span>
+                    <div>
+                        <select onchange="handleSetupMtmChange('${cat}', this.value)" class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                    <div id="setup-info-${cat.replace(/\s+/g, '-')}" class="text-[10px] space-y-0.5 text-slate-500">
+                        <div>S/N: <span class="font-mono text-slate-700">${currentEq ? currentEq.serial : '-'}</span></div>
+                        <div>Cal: <span class="text-slate-700">${currentEq ? currentEq.calDate : '-'}</span></div>
+                        <div>Cert: <span class="text-slate-700">${currentEq ? currentEq.cert : '-'}</span></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function handleSetupMtmChange(category, selectedMtm) {
+            const matched = state.equipmentMaster.find(e => e.category === category && e.mtm === selectedMtm);
+            const infoDiv = document.getElementById(`setup-info-${category.replace(/\s+/g, '-')}`);
+            if (matched) {
+                state.dailyEquipment[category] = matched;
+                infoDiv.innerHTML = `
+                    <div>S/N: <span class="font-mono text-slate-800 font-bold">${matched.serial}</span></div>
+                    <div>Cal: <span class="text-slate-800 font-medium">${matched.calDate}</span></div>
+                    <div>Cert: <span class="text-slate-800 font-medium">${matched.cert}</span></div>
+                `;
+            } else {
+                delete state.dailyEquipment[category];
+                infoDiv.innerHTML = `<div>S/N: <span class="font-mono text-slate-700">-</span></div>`;
+            }
+        }
+
+        function setSetupControlsEnabled(enabled) {
+            const initialsInput = document.getElementById('setup-tester-initials');
+            if (initialsInput) initialsInput.disabled = !enabled;
+            document.querySelectorAll('#equipment-setup-rows select').forEach(sel => sel.disabled = !enabled);
+        }
+
+        function lockAndVerifySetup() {
+            const initials = document.getElementById('setup-tester-initials').value.trim();
+            if (!initials) { alert("Please enter Tester Initials / Tech ID."); return; }
+
+            const missingCategories = EQUIP_CATEGORIES.filter(c => !state.dailyEquipment[c]);
+            if (missingCategories.length > 0) {
+                alert(`Please select calibrated instruments for all 5 categories. Missing: ${missingCategories.join(', ')}`);
+                return;
+            }
+
+            const expired = [];
+            EQUIP_CATEGORIES.forEach(cat => {
+                const eq = state.dailyEquipment[cat];
+                if (eq && isCalibrationExpired(eq.due)) expired.push(`${cat} (${eq.mtm}) – due ${eq.due}`);
+            });
+            if (expired.length > 0) {
+                alert("Cannot lock setup – the following instruments have expired calibration:\n\n" + expired.join('\n'));
+                return;
+            }
+
+            state.testerInitials = initials;
+            saveTesterInitials();
+            state.setupLocked = true;
+            setSetupControlsEnabled(false);
+
+            document.getElementById('setup-body').classList.add('hidden');
+            state.setupCollapsed = true;
+
+            document.getElementById('setup-lock-icon').className = "fa-solid fa-lock text-emerald-400";
+            document.getElementById('setup-status-tag').className = "text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30";
+            document.getElementById('setup-status-tag').textContent = `Verified (${initials})`;
+            document.getElementById('btn-toggle-lock').textContent = "Unlock Setup";
+        }
+
+        function toggleSetupLock() {
+            if (!state.setupLocked) {
+                alert("Use the blue “Lock Equipment Verification & Proceed” button to lock after selecting instruments.");
+                return;
+            }
+            state.setupLocked = false;
+            setSetupControlsEnabled(true);
+            document.getElementById('btn-toggle-lock').textContent = "Setup Unlocked";
+            document.getElementById('setup-lock-icon').className = "fa-solid fa-lock-open text-amber-400";
+            document.getElementById('setup-status-tag').textContent = "Action Required";
+            document.getElementById('setup-status-tag').className = "text-xs bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/30";
+        }
+
+        function toggleSetupBannerCollapse() {
+            const body = document.getElementById('setup-body');
+            const chevron = document.getElementById('setup-chevron');
+            state.setupCollapsed = !state.setupCollapsed;
+            if (state.setupCollapsed) { body.classList.add('hidden'); chevron.classList.add('rotate-180'); }
+            else { body.classList.remove('hidden'); chevron.classList.remove('rotate-180'); }
+        }
+
+        // --- INTERACTIVE DIAGRAM CANVAS ENGINE ---
+        let canvas, ctx;
+        function initCanvas() {
+            canvas = document.getElementById('leak-canvas');
+            ctx = canvas.getContext('2d');
+            canvas.addEventListener('click', handleCanvasClick);
+            window.addEventListener('resize', () => { resizeCanvas(); drawCanvas(); });
+            resizeCanvas();
+            drawCanvas();
+        }
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            let maxW = wrapper.clientWidth - 20;
+            if (maxW > 550) maxW = 550;
+            let w = maxW, h = maxW;
+            if (state.canvasShape === '1:2') { h = maxW * 1.3; w = maxW * 0.65; }
+            else if (state.canvasShape === '2:1') { w = maxW; h = maxW * 0.5; }
+            canvas.width = w; canvas.height = h;
+        }
+
+        function updateCanvasShape() {
+            state.canvasShape = document.getElementById('canvas-aspect-ratio').value;
+            resizeCanvas(); drawCanvas();
+        }
+
+        function drawCanvas() {
+            if (!canvas || !ctx) return;
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.fillStyle = '#fef3c7'; ctx.strokeStyle = '#d97706'; ctx.lineWidth = 4;
+            ctx.fillRect(0, 0, w, h); ctx.strokeRect(0, 0, w, h);
+
+            const margin = Math.min(w, h) * 0.12;
+            const mw = w - (margin * 2), mh = h - (margin * 2);
+
+            ctx.fillStyle = '#e0f2fe'; ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 2;
+            ctx.fillRect(margin, margin, mw, mh); ctx.strokeRect(margin, margin, mw, mh);
+
+            state.canvasMarkers.forEach((m) => {
+                const px = m.xPercent * w, py = m.yPercent * h;
+                ctx.beginPath();
+                ctx.arc(px, py, 7, 0, Math.PI * 2);
+                ctx.fillStyle = m.zone === 'gasket' ? '#dc2626' : '#ea580c';
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+            });
+            document.getElementById('marker-badge').textContent = `${state.canvasMarkers.length} Defect(s)`;
+        }
+
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left, y = e.clientY - rect.top;
+            const w = canvas.width, h = canvas.height;
+            const margin = Math.min(w, h) * 0.12;
+
+            const xPercent = x / w, yPercent = y / h;
+            const isMedia = (x >= margin && x <= (w - margin) && y >= margin && y <= (h - margin));
+            const zone = isMedia ? 'media' : 'gasket';
+
+            state.canvasMarkers.push({ xPercent, yPercent, zone });
+            drawCanvas();
+
+            const notesField = document.getElementById('test-notes');
+            let currentNotes = notesField.value;
+            if (zone === 'gasket' && !currentNotes.includes('Gasket leak detected.')) {
+                notesField.value = (currentNotes ? currentNotes + '\n' : '') + 'Gasket leak detected.';
+            } else if (zone === 'media' && !currentNotes.includes('Filter media leak detected.')) {
+                notesField.value = (currentNotes ? currentNotes + '\n' : '') + 'Filter media leak detected.';
+            }
+        }
+
+        function clearCanvasMarkers() {
+            state.canvasMarkers = [];
+            drawCanvas();
+            const notesField = document.getElementById('test-notes');
+            notesField.value = notesField.value.replace('Gasket leak detected.', '').replace('Filter media leak detected.', '').trim();
+        }
+
+        function toggleCanvasAccordion() {
+            const body = document.getElementById('canvas-accordion-body');
+            const chevron = document.getElementById('canvas-chevron');
+            state.canvasCollapsed = !state.canvasCollapsed;
+            if (state.canvasCollapsed) { body.classList.add('hidden'); chevron.classList.add('-rotate-90'); }
+            else { body.classList.remove('hidden'); chevron.classList.remove('-rotate-90'); setTimeout(drawCanvas, 50); }
+        }
+
+        function calculateScratchpad() {
+            const pen = parseFloat(document.getElementById('scratch-penetration').value) || 0;
+            document.getElementById('scratch-calc-eff').textContent = `${(100 - pen).toFixed(4)}%`;
+        }
+
+        function applyScratchpadToEfficiency() {
+            const pen = parseFloat(document.getElementById('scratch-penetration').value) || 0;
+            document.getElementById('test-efficiency').value = (100 - pen).toFixed(4);
+        }
+
+        function handleStatusChange() {
+            const selectedStatus = document.querySelector('input[name="test-status"]:checked')?.value;
+            const effStar = document.getElementById('efficiency-required-star');
+            const effInput = document.getElementById('test-efficiency');
+            if (selectedStatus === 'NLD') {
+                effStar.classList.add('hidden');
+                effInput.value = 'No leakage detected';
+                effInput.readOnly = true;
+                effInput.className = "w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 cursor-not-allowed";
+            } else {
+                effStar.classList.remove('hidden');
+                if (effInput.value === 'No leakage detected') effInput.value = '';
+                effInput.readOnly = false;
+                effInput.className = "w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 font-semibold text-slate-800";
+            }
+        }
+
+        function submitFilterTestRecord() {
+            if (!state.setupLocked) { alert("Please lock Equipment Verification banner before submitting tests."); return; }
+
+            const filterTag = getFullFilterTag();
+            const room = document.getElementById('test-room').value.trim();
+            const ahu = document.getElementById('test-ahu').value.trim();
+            const size = document.getElementById('test-size').value.trim();
+            const pressureDrop = document.getElementById('test-pressure-drop').value;
+            const velocity = document.getElementById('test-velocity').value;
+            const direction = document.getElementById('test-direction').value;
+            const statusRadio = document.querySelector('input[name="test-status"]:checked');
+            const efficiency = document.getElementById('test-efficiency').value;
+
+            if (!filterTag || !pressureDrop || !velocity || !direction || !statusRadio) {
+                alert("Please fill in all mandatory fields (Filter Tag, Pressure Drop, Velocity, Direction, Test Status).");
+                return;
+            }
+
+            const status = statusRadio.value;
+            if (status !== 'NLD' && (!efficiency || efficiency === 'No leakage detected')) {
+                alert("Efficiency (%) is mandatory for NLDAR and LDNR statuses.");
+                return;
+            }
+
+            if (status === 'NLD' && state.canvasMarkers.length > 0) {
+                openModal('modal-nld-conflict');
+                return;
+            }
+
+            const dupIndex = state.records.findIndex(r => r.filterTag === filterTag && r.id !== state.editingRecordId);
+            if (dupIndex !== -1) {
+                document.getElementById('modal-dup-tag').textContent = filterTag;
+                openModal('modal-duplicate');
+                return;
+            }
+
+            commitRecordSave();
+        }
+
+        function forceNLDSubmit() { clearCanvasMarkers(); closeModal(); commitRecordSave(); }
+        function resolveDuplicate(action) {
+            closeModal();
+            if (action === 'overwrite') {
+                state.records = state.records.filter(r => r.filterTag !== getFullFilterTag());
+                commitRecordSave();
+            } else { commitRecordSave(true); }
+        }
+
+        function commitRecordSave(forceDuplicateAdd = false) {
+            const direction = document.getElementById('test-direction').value;
+            let filterTag = getFullFilterTag();
+            if (forceDuplicateAdd) filterTag += `_${Date.now().toString().slice(-4)}`;
+
+            const statusVal = document.querySelector('input[name="test-status"]:checked').value;
+            const effVal = (statusVal === 'NLD') ? 'No leakage detected' : document.getElementById('test-efficiency').value.trim();
+
+            let original = state.editingRecordId ? state.records.find(r => r.id === state.editingRecordId) : null;
+
+            const recordData = {
+                id: state.editingRecordId || Date.now().toString(),
+                date: original ? original.date : TODAY_GMP,
+                tester: original ? original.tester : state.testerInitials,
+                filterTag,
+                room: document.getElementById('test-room').value.trim(),
+                ahu: document.getElementById('test-ahu').value.trim(),
+                size: document.getElementById('test-size').value.trim(),
+                pressureDrop: parseFloat(document.getElementById('test-pressure-drop').value).toFixed(1),
+                velocity: parseFloat(document.getElementById('test-velocity').value).toFixed(2),
+                direction,
+                status: statusVal,
+                efficiency: effVal,
+                notes: document.getElementById('test-notes').value.trim(),
+                canvasShape: state.canvasShape,
+                canvasMarkers: [...state.canvasMarkers],
+                equipmentSnapshot: original?.equipmentSnapshot || JSON.parse(JSON.stringify(state.dailyEquipment))
+            };
+
+            if (state.editingRecordId) {
+                const idx = state.records.findIndex(r => r.id === state.editingRecordId);
+                if (idx !== -1) state.records[idx] = recordData;
+                state.editingRecordId = null;
+            } else {
+                state.records.unshift(recordData);
+            }
+
+            document.getElementById('editing-badge').classList.add('hidden');
+            document.getElementById('btn-submit-text').textContent = "Commit Test Record";
+
+            saveRecords();
+            renderRecordsTable();
+            executeFormReset();
+            alert("Test record successfully saved to local vault.");
+        }
+
+        function editRecord(recordId) {
+            const rec = state.records.find(r => r.id === recordId);
+            if (!rec) return;
+
+            state.editingRecordId = rec.id;
+            if (rec.filterTag.includes('-')) {
+                const lastDash = rec.filterTag.lastIndexOf('-');
+                document.getElementById('test-filter-prefix').value = rec.filterTag.substring(0, lastDash);
+                document.getElementById('test-filter-suffix').value = rec.filterTag.substring(lastDash + 1);
+            } else {
+                document.getElementById('test-filter-prefix').value = rec.filterTag;
+                document.getElementById('test-filter-suffix').value = '';
+            }
+            updateFullTagPreview();
+
+            document.getElementById('test-room').value = rec.room || '';
+            document.getElementById('test-ahu').value = rec.ahu || '';
+            document.getElementById('test-size').value = rec.size || '';
+            document.getElementById('test-pressure-drop').value = rec.pressureDrop;
+            document.getElementById('test-velocity').value = rec.velocity;
+            document.getElementById('test-direction').value = rec.direction;
+            document.getElementById('test-notes').value = rec.notes;
+
+            const radio = document.querySelector(`input[name="test-status"][value="${rec.status}"]`);
+            if (radio) radio.checked = true;
+            handleStatusChange();
+            if (rec.status !== 'NLD') document.getElementById('test-efficiency').value = rec.efficiency;
+
+            state.canvasShape = rec.canvasShape || '1:1';
+            document.getElementById('canvas-aspect-ratio').value = state.canvasShape;
+            state.canvasMarkers = rec.canvasMarkers ? [...rec.canvasMarkers] : [];
+            resizeCanvas(); drawCanvas();
+
+            document.getElementById('editing-badge').classList.remove('hidden');
+            document.getElementById('btn-submit-text').textContent = "Update Committed Record";
+            switchTab('testing');
+        }
+
+        function cancelEditing() {
+            state.editingRecordId = null;
+            document.getElementById('editing-badge').classList.add('hidden');
+            document.getElementById('btn-submit-text').textContent = "Commit Test Record";
+            executeFormReset();
+        }
+
+        function confirmResetForm() { openModal('modal-reset-confirm'); }
+
+        function executeFormReset() {
+            document.getElementById('test-filter-suffix').value = '';
+            document.getElementById('test-filter-prefix').value = state.filterPrefix; // never leave a scheduled/edited tag behind in the prefix box
+            document.getElementById('test-room').value = '';
+            document.getElementById('test-ahu').value = '';
+            document.getElementById('test-size').value = '';
+            updateFullTagPreview();
+
+            document.getElementById('test-pressure-drop').value = '';
+            document.getElementById('test-velocity').value = '';
+            document.getElementById('test-direction').value = '';
+            document.getElementById('test-notes').value = '';
+            
+            const checkedStatus = document.querySelector('input[name="test-status"]:checked');
+            if (checkedStatus) checkedStatus.checked = false;
+
+            const effInput = document.getElementById('test-efficiency');
+            effInput.value = 'No leakage detected';
+            effInput.readOnly = true;
+
+            state.canvasMarkers = [];
+            drawCanvas();
+            if (state.editingRecordId) cancelEditing();
+            document.getElementById('selected-schedule-meta').classList.add('hidden');
+            renderScheduleSelector();
+            closeModal();
+        }
+
+        // --- EQUIPMENT VAULT ---
+        function renderEquipmentTable() {
+            const tbody = document.getElementById('equip-table-body');
+            tbody.innerHTML = '';
+            state.equipmentMaster.forEach(eq => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 font-semibold text-slate-800">${escapeHtml(eq.category)}</td>
+                        <td class="p-3 font-mono font-bold text-sky-700">${escapeHtml(eq.mtm)}</td>
+                        <td class="p-3 font-mono text-slate-600">${escapeHtml(eq.serial)}</td>
+                        <td class="p-3">${escapeHtml(eq.calDate)}</td>
+                        <td class="p-3 font-medium text-slate-700">${escapeHtml(eq.due)}</td>
+                        <td class="p-3 font-mono text-slate-600">${escapeHtml(eq.cert)}</td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="editEquipment('${escapeHtml(eq.id)}')" class="text-sky-600 hover:text-sky-800 font-bold">Edit</button>
+                            <button onclick="deleteEquipment('${escapeHtml(eq.id)}')" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function autoCalculateCalDue() {
+            const calVal = document.getElementById('equip-cal-date').value;
+            if (!calVal) return;
+            const d = new Date(calVal);
+            d.setFullYear(d.getFullYear() + 1);
+            document.getElementById('equip-due-date').value = formatGMPDate(d);
+        }
+
+        function handleSaveEquipment(e) {
+            e.preventDefault();
+            const editId = document.getElementById('equip-edit-id').value;
+            const category = document.getElementById('equip-category').value;
+            const mtm = document.getElementById('equip-mtm').value.trim().toUpperCase();
+            const serial = document.getElementById('equip-serial').value.trim().toUpperCase();
+            const calDateRaw = document.getElementById('equip-cal-date').value;
+            const cert = document.getElementById('equip-cert').value.trim().toUpperCase();
+
+            const [y, m, d] = calDateRaw.split('-').map(Number);
+            const calDateObj = new Date(y, m - 1, d);
+            const dueObj = new Date(y, m - 1, d);
+            dueObj.setFullYear(dueObj.getFullYear() + 1);
+
+            if (editId) {
+                const idx = state.equipmentMaster.findIndex(i => i.id === editId);
+                if (idx !== -1) state.equipmentMaster[idx] = { id: editId, category, mtm, serial, calDate: formatGMPDate(calDateObj), due: formatGMPDate(dueObj), cert };
+            } else {
+                state.equipmentMaster.push({ id: Date.now().toString(), category, mtm, serial, calDate: formatGMPDate(calDateObj), due: formatGMPDate(dueObj), cert });
+            }
+
+            saveEquipMaster();
+            renderEquipmentTable();
+            renderEquipmentSetupRows();
+            resetEquipForm();
+        }
+
+        function editEquipment(id) {
+            const eq = state.equipmentMaster.find(i => i.id === id);
+            if (!eq) return;
+            document.getElementById('equip-edit-id').value = eq.id;
+            document.getElementById('equip-category').value = eq.category;
+            document.getElementById('equip-mtm').value = eq.mtm;
+            document.getElementById('equip-serial').value = eq.serial;
+            document.getElementById('equip-cert').value = eq.cert;
+            document.getElementById('equip-cal-date').value = parseGMPDateToISO(eq.calDate);
+            document.getElementById('equip-due-date').value = eq.due;
+        }
+
+        function deleteEquipment(id) {
+            if (confirm("Delete this instrument?")) {
+                state.equipmentMaster = state.equipmentMaster.filter(i => i.id !== id);
+                saveEquipMaster();
+                renderEquipmentTable();
+                renderEquipmentSetupRows();
+            }
+        }
+
+        function resetEquipForm() {
+            document.getElementById('equip-form').reset();
+            document.getElementById('equip-edit-id').value = '';
+            document.getElementById('equip-due-date').value = '';
+        }
+
+        // --- RECORDS VAULT ---
+        function renderRecordsTable() {
+            const tbody = document.getElementById('records-table-body');
+            tbody.innerHTML = '';
+            if (state.records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400 italic">No filter test records stored in vault session.</td></tr>`;
+                return;
+            }
+
+            state.records.forEach(rec => {
+                let badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                if (rec.status === 'NLDAR') badgeClass = "bg-amber-100 text-amber-800 border-amber-300";
+                if (rec.status === 'LDNR') badgeClass = "bg-red-100 text-red-800 border-red-300";
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 text-slate-600 font-medium">${escapeHtml(rec.date)}</td>
+                        <td class="p-3 font-mono font-bold text-slate-800">${escapeHtml(rec.filterTag)}</td>
+                        <td class="p-3">${escapeHtml(rec.room || '-')} / ${escapeHtml(rec.ahu || '-')}</td>
+                        <td class="p-3 font-mono">${escapeHtml(rec.pressureDrop)} Pa</td>
+                        <td class="p-3 font-mono">${escapeHtml(rec.velocity)} m/s</td>
+                        <td class="p-3"><span class="px-2 py-0.5 text-[10px] font-bold rounded border ${badgeClass}">${escapeHtml(rec.status)}</span></td>
+                        <td class="p-3 font-mono">${escapeHtml(rec.efficiency)}</td>
+                        <td class="p-3 font-bold text-slate-700">${rec.canvasMarkers?.length || 0}</td>
+                        <td class="p-3 text-right space-x-2">
+                            <button onclick="editRecord('${escapeHtml(rec.id)}')" class="text-sky-600 hover:text-sky-800 font-bold">Edit</button>
+                            <button onclick="deleteRecord('${escapeHtml(rec.id)}')" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function deleteRecord(id) {
+            if (confirm("Delete this record?")) {
+                state.records = state.records.filter(r => r.id !== id);
+                saveRecords();
+                renderRecordsTable();
+            }
+        }
+
+        function confirmWipeSession() { openModal('modal-wipe-confirm'); }
+        function executeSessionWipe() {
+            try { saveJSONBackup(); } catch(e) {}
+            state.records = [];
+            saveRecords();
+            renderRecordsTable();
+            closeModal();
+            alert("Vault wiped successfully.");
+        }
+
+        function openModal(id) {
+            document.getElementById('modal-backdrop').classList.remove('hidden');
+            ['modal-duplicate', 'modal-nld-conflict', 'modal-reset-confirm', 'modal-wipe-confirm'].forEach(m => {
+                if (m === id) document.getElementById(m).classList.remove('hidden');
+                else document.getElementById(m).classList.add('hidden');
+            });
+        }
+        function closeModal() { document.getElementById('modal-backdrop').classList.add('hidden'); }
+
+        // --- CSV EXPORT ---
+        function exportCSV() {
+            if (state.records.length === 0) { alert("No records to export."); return; }
+            const headers = ["Date", "Tester", "Filter Tag", "Room", "AHU", "Size", "Pressure Drop (Pa)", "Velocity (m/s)", "Direction", "Status", "Efficiency", "Leaks", "Notes"];
+            const lines = [headers.map(escapeCsvField).join(",")];
+
+            state.records.forEach(r => {
+                const row = [r.date, r.tester, r.filterTag, r.room || "", r.ahu || "", r.size || "", r.pressureDrop, r.velocity, r.direction, r.status, r.efficiency, r.canvasMarkers?.length || 0, r.notes || ""];
+                lines.push(row.map(escapeCsvField).join(","));
+            });
+
+            const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `HEPA_Filter_Report_${TODAY_GMP.replace(/\//g, '-')}.csv`;
+            link.click();
+        }
+
+        // --- PDF EXPORT ---
+        function exportPDF() {
+            if (state.records.length === 0) { alert("No records available."); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            let y = 12;
+
+            doc.setFillColor(15, 23, 42);
+            doc.rect(10, 10, pageWidth - 20, 18, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+            doc.text("HEPA FILTER FIELD TESTING & VALIDATION REPORT", 14, 18);
+            doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+            doc.text(`GMP Date: ${TODAY_GMP}  |  Tech ID: ${state.testerInitials || 'VERIFIED'}`, 14, 23);
+
+            y = 33;
+            state.records.forEach((rec, idx) => {
+                if (y > pageHeight - 60) { doc.addPage(); y = 15; }
+
+                doc.setFillColor(2, 132, 199);
+                doc.rect(10, y, pageWidth - 20, 6, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+                doc.text(`TEST ITEM #${idx + 1} - TAG: ${rec.filterTag} (Room: ${rec.room || 'N/A'} | AHU: ${rec.ahu || 'N/A'})`, 12, y + 4.2);
+                doc.text(`STATUS: ${rec.status}`, pageWidth - 45, y + 4.2);
+
+                y += 6;
+                doc.setDrawColor(203, 213, 225);
+                doc.rect(10, y, pageWidth - 20, 42);
+
+                const thumbCanvas = document.createElement('canvas');
+                thumbCanvas.width = 120; thumbCanvas.height = 120;
+                const tCtx = thumbCanvas.getContext('2d');
+                tCtx.fillStyle = '#fef3c7'; tCtx.fillRect(0, 0, 120, 120);
+                tCtx.fillStyle = '#e0f2fe'; tCtx.fillRect(15, 15, 90, 90);
+                tCtx.strokeStyle = '#0284c7'; tCtx.strokeRect(15, 15, 90, 90);
+
+                if (rec.canvasMarkers) {
+                    rec.canvasMarkers.forEach(m => {
+                        tCtx.beginPath();
+                        tCtx.arc(m.xPercent * 120, m.yPercent * 120, 4, 0, Math.PI * 2);
+                        tCtx.fillStyle = '#dc2626'; tCtx.fill();
+                    });
+                }
+
+                doc.addImage(thumbCanvas.toDataURL('image/png'), 'PNG', 12, y + 2, 38, 38);
+
+                const startX = 55;
+                doc.setFontSize(7.5); doc.setTextColor(30, 41, 59);
+                doc.setFont('helvetica', 'bold'); doc.text("Pressure Drop:", startX, y + 7);
+                doc.setFont('helvetica', 'normal'); doc.text(`${rec.pressureDrop} Pa`, startX + 28, y + 7);
+
+                doc.setFont('helvetica', 'bold'); doc.text("Air Velocity:", startX, y + 13);
+                doc.setFont('helvetica', 'normal'); doc.text(`${rec.velocity} m/s (${rec.direction})`, startX + 28, y + 13);
+
+                doc.setFont('helvetica', 'bold'); doc.text("Filter Size:", startX, y + 19);
+                doc.setFont('helvetica', 'normal'); doc.text(`${rec.size || 'N/A'}`, startX + 28, y + 19);
+
+                doc.setFont('helvetica', 'bold'); doc.text("Efficiency:", startX, y + 25);
+                doc.setFont('helvetica', 'normal'); doc.text(`${rec.efficiency}`, startX + 28, y + 25);
+
+                doc.setFont('helvetica', 'bold'); doc.text("Notes:", startX, y + 31);
+                doc.setFont('helvetica', 'normal'); doc.text(doc.splitTextToSize(rec.notes || "None.", 115), startX, y + 35);
+
+                y += 48;
+            });
+
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(6.5); doc.setTextColor(100, 116, 139);
+                doc.text(`Page ${i} of ${totalPages}`, pageWidth - 22, pageHeight - 6);
+            }
+
+            doc.save(`HEPA_Validation_Report_${TODAY_GMP.replace(/\//g, '-')}.pdf`);
+        }
+    </script>
+</body>
+</html>
