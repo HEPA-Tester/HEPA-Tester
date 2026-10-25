@@ -13,3 +13,9 @@
 - Commit and push changes in new branch to make a pull request (keep main default). Edit the pull request details.
 - Someone will review and approve your changes (oatMilk223). After approval merge code.
 - Merged code will now be in main.
+
+## Helpful Resources:
+
+- Using [CLAUDE.md](https://claude.com/resources/articles/using-claude-md-files)
+- [Git commands](https://github.blog/developer-skills/github/github-for-beginners-your-roadmap-to-mastering-the-github-essentials/)
+- [How to use Git and GitHub](https://www.freecodecamp.org/news/guide-to-git-github-for-beginners-and-experienced-devs/)
