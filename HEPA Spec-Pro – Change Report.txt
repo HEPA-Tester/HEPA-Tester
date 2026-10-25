@@ -1,0 +1,108 @@
+HEPA Spec-Pro – Change Report
+
+25/OCT/2026
+
+Summary
+
+HEPA Spec-Pro went from version 5 to version 16 today: all 12 code-review issues are fixed, 25+ improvements were added, and 396 automated checks now pass with the internet switched off.
+
+The app now works fully offline (including the real PDF), backs itself up automatically, keeps re-tests and repairs on record, and protects against the main ways field data could be lost. Every change is commented in the code with a [TAG] and listed in the change log at the top of the script. Latest file: HEPA-Spec-Pro-Schedule-Update (16).html.
+
+Code-review fixes (versions 6–10)
+
+All 12 issues from the review are fixed.
+
+| # | Issue | Fix |
+| 1 | Editing a record removed the dash from tags like AHU-02-F001 | Whole tag kept in one box when editing |
+| 2 | "Overwrite" could delete records and still say "saved" | Edited record always kept; every save goes through the duplicate check |
+| 3 | Loading a JSON backup replaced everything with no checks | File checked first; choose Merge or Replace; Replace backs up first |
+| 4 | Leak canvas shrank, opened at the wrong size, mis-placed zones | Sized from the page, not itself; taps mapped exactly to gasket/media |
+| 5 | A "locked" setup could still change; expired instruments usable | Stays locked; expired or deleted instruments unlock it |
+| 6 | Duplicate pop-up had no Cancel | Cancel added |
+| 7 | Session wipe deleted even if the backup failed | Deletes only after you confirm the backup saved |
+| 8 | Equipment/backup text could inject HTML | All values escaped; no buttons built from data |
+| 9 | Date fixed when the page opened (overnight tablets) | Date worked out at save; new day needs re-verification |
+| 10 | PDF missed tester/instruments; long notes overlapped | Each record shows its own data; blocks size to fit; shape-true thumbnails |
+| 11 | Corrupt saved data stopped the app starting | Bad data set aside safely; "storage full" reported |
+| 12 | App needed internet to look right | Styles and icons built in (PDF followed in version 14) |
+
+Features added on request
+
+| Feature | What it does |
+| Tablet fit | Tall filters fit on an 11" tablet screen in landscape without scrolling |
+| Client and Job | Required in the daily lock section, remembered between days, stamped on every record |
+| MTM letterhead | Company name and address on the PDF, plus the company name in every footer |
+| Oldest-first PDF | Filters listed by test date, then commit order, for multi-day reports |
+| Test Vault sort | Newest, oldest, Room then AHU, AHU then Room (natural number order) |
+| "Manometer" | Renamed from "Manometer (Micrometer)" everywhere; old data converted automatically |
+
+Field-scenario fixes (version 11)
+
+Edge-case testing found one data-loss bug and nine behaviours worth fixing; all are done.
+
+| Area | Fix |
+| Two tabs open | Saves in one tab no longer delete the other's records; tabs stay in sync; a banner warns |
+| Re-test after repair | "Save as Re-test" keeps the real tag and numbers tests (Test 2, 3…); the failed result stays on record |
+| Overwrite | Asks first and warns if it would delete a failed (LDNR) test |
+| Tablet reload | Unfinished test restored as a draft; today's locked setup re-locks itself |
+| Shape change | Leaks plotted before setting the shape are relabelled gasket/media |
+| Auto notes | Only whole "leak detected" lines are added or removed; the tech's own notes are untouched |
+| Readings | Warning for pressure < 0 or > 1000 Pa, velocity ≤ 0 or > 5 m/s, efficiency outside 0–100% |
+| Delete while editing | Cancels the edit instead of bringing the record back |
+
+Daily-use features (version 12)
+
+| Feature | What it does |
+| Progress strip | "12/47 tested · 35 remaining · NLD · NLDAR · LDNR" under the schedule bar, with a progress bar |
+| Merge / Replace buttons | Tap instead of typing MERGE or REPLACE when loading a schedule or backup |
+| AHU / Room filter | Test Vault narrows to one AHU and/or room; CSV and PDF follow; file names show the filter |
+| Repair fields | Optional repair method and details for NLDAR; re-tests show which result they follow |
+| Earlier-result hint | Typing a tag that was already tested shows its latest result |
+| Editable letterhead | Company name and address editable in the Equipment Vault; saved on the tablet |
+| Header on every page | PDF pages after the first carry a compact company / client / job header |
+
+Audit trail (log of edits, deletes and overwrites) was deliberately left out for now.
+
+Offline PDF and backups (versions 13–14)
+
+The real PDF now works with no signal, and backups happen in three layers so nobody has to remember.
+
+| Layer | How it works |
+| PDF library built in | jsPDF 2.5.1 embedded (checked genuine before use); a printable report remains as a fallback |
+| Automatic snapshots | Every commit and delete saves a copy inside the browser (up to 60); "Recover Snapshot" rolls back |
+| Daily snapshot clear | Once the day's backup file is made, earlier days' snapshots are cleared |
+| "Not backed up" counter | Badge and progress-strip line; reminder every 10 changes and the next morning |
+| Back up now | iPad Share sheet (Files / OneDrive / Mail), otherwise a download |
+| Backup with export | The daily CSV or PDF also saves the backup file when anything changed |
+
+Snapshots protect against mistakes on the tablet; only the backup file protects against a lost or wiped tablet.
+
+Later testing rounds (versions 15–16)
+
+| Area | Fix |
+| Clients and jobs | F-001 on another client/job is treated as a different filter (schedule, re-tests, overwrite) |
+| Edit safety | Session wipe or a Restore-Replace cancels an open edit |
+| Efficiency | Must be a number for NLDAR/LDNR (99.995 or 99.995%) |
+| iPad fields | 16px text on touch screens stops auto-zoom; no double-tap zoom on the canvas |
+| Undo Last | Removes only the last leak marker |
+| PDF header | Long tag / room / AHU shortened to fit; full location printed as its own line |
+| Clock check | Warns if the tablet's date is earlier than the newest record |
+| Storage protection | Asks the browser to keep the app's data; result shown in the Test Vault |
+| Empty-vault warning | Flags a vault that was emptied unexpectedly and offers Load JSON Backup |
+| Strict dates | Impossible or garbled due dates (31/FEB, "abcd" years) block the instrument and are labelled |
+| CSV quotes | An unclosed quote stops the import with the line number instead of loading half a file |
+
+Testing
+
+All 396 automated checks pass on version 16, up from 108 at version 10; every run blocks all internet access, so the whole suite also proves offline use.
+
+- Covered: equipment import and selection, daily verification, testing, saving, editing and re-testing; reloads, two tabs and corrupt data; CSV, JSON backup/restore, real PDF and printable report; a full 50-filter day and a 250-record week; messy CSV files, odd input and hostile text.
+- Not covered: the real iPad (Safari, touch, the Share sheet, opening from OneDrive). Tests ran in desktop Chrome.
+
+Open items
+
+- [ ] Test on the tablet: lock setup, test a few filters, PDF online and in airplane mode, Back up now to OneDrive
+- [ ] Open the app from OneDrive on the tablet and confirm records survive closing and reopening
+- [ ] Run one pilot job alongside the current method before relying on the app
+- [ ] Decide on the audit trail (log of edits, deletes, overwrites) – deferred today
+- [ ] Check what clients' QA expect for GMP computerised-system validation (e.g. Annex 11)
