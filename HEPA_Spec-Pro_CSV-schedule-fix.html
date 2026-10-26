@@ -132,10 +132,13 @@
                     </div>
                 </div>
 
-                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                     <input type="file" id="job-csv-input" accept=".csv" class="hidden" onchange="handleJobCSVImport(event)">
                     <button onclick="document.getElementById('job-csv-input').click()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-lg font-semibold transition flex items-center shadow-sm">
                         <i class="fa-solid fa-upload mr-1.5"></i>Upload Schedule CSV
+                    </button>
+                    <button onclick="exportJobScheduleCSV()" id="btn-export-schedule" class="hidden text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-lg font-semibold transition flex items-center shadow-sm">
+                        <i class="fa-solid fa-download mr-1.5"></i>Export Schedule
                     </button>
                     <button onclick="clearJobSchedule()" id="btn-clear-schedule" class="hidden text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium transition">
                         Clear Schedule
@@ -196,8 +199,11 @@
                             <input type="text" id="test-filter-prefix" oninput="updateFullTagPreview(); saveFilterPrefix();" placeholder="Prefix (e.g. 719HF0010)" class="w-2/3 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase font-semibold text-slate-700">
                             <input type="text" id="test-filter-suffix" oninput="updateFullTagPreview()" placeholder="No. (001)" class="w-1/3 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none uppercase font-semibold text-slate-800">
                         </div>
-                        <div class="text-[11px] text-slate-400 font-mono italic">
-                            Full Tag: <span id="full-tag-preview" class="font-bold text-sky-700">---</span>
+                        <div class="text-[11px] text-slate-400 font-mono italic flex items-center gap-2 flex-wrap">
+                            <span>Full Tag: <span id="full-tag-preview" class="font-bold text-sky-700">---</span></span>
+                            <button type="button" onclick="manualAddCurrentToSchedule()" id="btn-add-to-schedule" class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold transition" title="Add this filter tag + room/AHU/size to the job schedule">
+                                <i class="fa-solid fa-plus mr-0.5"></i>Add to schedule
+                            </button>
                         </div>
                     </div>
                     <div>
@@ -388,6 +394,28 @@
                         <h2 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-sliders text-sky-600 mr-2"></i>Equipment Calibration Master Vault</h2>
                         <p class="text-xs text-slate-500">Register and manage standards, calibration dates, and MTM inventory tracking.</p>
                     </div>
+                </div>
+
+                <!-- Bulk Upload Instruments (CSV) -->
+                <div class="bg-indigo-50/60 border border-indigo-200 rounded-xl p-4 space-y-3">
+                    <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-3">
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-white text-indigo-600 p-2.5 rounded-xl border border-indigo-100"><i class="fa-solid fa-file-excel text-lg"></i></div>
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Bulk Upload Instruments (CSV)</h3>
+                                <p class="text-[11px] text-slate-500 max-w-xl">Columns: <b>Category, MTM ID, Serial Number, Calibration Date, Certificate Number</b> (Calibration Due Date is optional and defaults to +1 year). New MTM IDs are added; MTM IDs already in the vault are updated. Dates can be written 15/03/2026, 15/MAR/2026 or 2026-03-15.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="file" id="equip-csv-input" accept=".csv,text/csv" class="hidden" onchange="handleEquipCSVImport(event)">
+                            <button type="button" onclick="document.getElementById('equip-csv-input').click()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg font-semibold shadow-sm transition flex items-center">
+                                <i class="fa-solid fa-upload mr-1.5"></i>Upload Equipment CSV
+                            </button>
+                            <button type="button" onclick="downloadEquipTemplate()" class="text-xs bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg font-medium transition">Download Template</button>
+                            <button type="button" onclick="exportEquipmentCSV()" class="text-xs bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg font-medium transition">Export Current</button>
+                        </div>
+                    </div>
+                    <div id="equip-import-report" class="hidden text-[11px] bg-white border border-slate-200 rounded-lg p-3 text-slate-600"></div>
                 </div>
 
                 <!-- Add Equipment Form -->
@@ -617,7 +645,22 @@
             return new Date(y, m - 1, d);
         }
 
+        /**
+         * True when a value means "not applicable" (N/A, NA, etc.).
+         * Used mainly for Generators – they are not calibrated under GMP.
+         */
+        function isNA(val) {
+            if (val == null) return false;
+            const s = String(val).trim().toUpperCase().replace(/\./g, '');
+            return s === 'NA' || s === 'N/A' || s === 'NOT APPLICABLE' || s === 'NONE';
+        }
+
+        /**
+         * True when a calibration due date has already passed.
+         * N/A dates (Generators) are never treated as expired.
+         */
         function isCalibrationExpired(dueGmp) {
+            if (isNA(dueGmp)) return false;
             const due = parseGMPDate(dueGmp);
             if (!due) return true;
             const today = new Date();
@@ -819,7 +862,12 @@
             const filterTag = t(s.filterTag).toUpperCase();
             if (!filterTag) return null;
             const size = t(s.size);
-            return { filterTag, room: t(s.room), ahu: t(s.ahu), size, type: t(s.type), area: t(s.area), job: t(s.job), aspect: validAspect(s.aspect) || aspectFromSize(size) };
+            return {
+                filterTag, room: t(s.room), ahu: t(s.ahu), size,
+                type: t(s.type), area: t(s.area), job: t(s.job),
+                aspect: validAspect(s.aspect) || aspectFromSize(size),
+                added: !!s.added  // true if added in-app (not from original CSV)
+            };
         }
         function persistSchedule() {
             try {
@@ -836,6 +884,124 @@
             const m = new Map();
             state.records.forEach(r => { if (!m.has(r.filterTag)) m.set(r.filterTag, r); });
             return m;
+        }
+
+        /**
+         * Add a filter to the job schedule, or update it if the tag already exists.
+         * Never overwrites an existing Room/AHU/Size with a blank value.
+         * Returns: 'added' | 'updated' | 'unchanged' | null
+         */
+        function upsertScheduleItem(item, { silent = false } = {}) {
+            const clean = sanitizeScheduleItem(item);
+            if (!clean) return null;
+            const idx = state.jobSchedule.findIndex(s => s.filterTag === clean.filterTag);
+            if (idx === -1) {
+                state.jobSchedule.push(clean);
+                persistSchedule();
+                if (!silent) renderScheduleSelector();
+                return 'added';
+            }
+            // Only fill in fields that are currently empty or different – never clear them
+            const cur = state.jobSchedule[idx];
+            let changed = false;
+            ['room', 'ahu', 'size', 'type', 'area', 'job', 'aspect'].forEach(k => {
+                if (clean[k] && clean[k] !== cur[k]) { cur[k] = clean[k]; changed = true; }
+            });
+            if (clean.added) cur.added = true;
+            if (changed) {
+                persistSchedule();
+                if (!silent) renderScheduleSelector();
+                return 'updated';
+            }
+            return 'unchanged';
+        }
+
+        /** Read Room, AHU, Size, and aspect from the test form into a schedule entry. */
+        function scheduleItemFromForm(filterTag) {
+            const tag = (filterTag || getFullFilterTag() || '').toUpperCase();
+            if (!tag) return null;
+            return {
+                filterTag: tag,
+                room: document.getElementById('test-room').value.trim(),
+                ahu: document.getElementById('test-ahu').value.trim(),
+                size: document.getElementById('test-size').value.trim(),
+                aspect: document.getElementById('canvas-aspect-ratio')?.value || '',
+                added: true
+            };
+        }
+
+        /** Manual "Add to schedule" button – works even with no CSV uploaded. */
+        function manualAddCurrentToSchedule() {
+            const tag = getFullFilterTag();
+            if (!tag) {
+                alert('Enter a Filter Tag first.');
+                return;
+            }
+            const result = upsertScheduleItem(scheduleItemFromForm(tag));
+            if (result === 'added') {
+                alert(`Added ${tag} to the job schedule.`);
+            } else if (result === 'updated') {
+                alert(`Updated schedule details for ${tag}.`);
+            } else if (result === 'unchanged') {
+                alert(`${tag} is already on the job schedule with the same details.`);
+            }
+        }
+
+        /**
+         * After saving a test: if a job schedule is loaded and this filter is missing,
+         * ask the user whether to add it so the next export includes it.
+         */
+        function ensureScheduleHasFilter(filterTag, meta) {
+            if (!filterTag) return;
+            const exists = state.jobSchedule.some(s => s.filterTag === filterTag);
+            if (exists) {
+                // Already on the list – quietly fill any blank room/AHU/size from the form
+                upsertScheduleItem({ filterTag, ...meta, added: false }, { silent: true });
+                return;
+            }
+            if (state.jobSchedule.length === 0) {
+                // No schedule in use – skip the prompt
+                return;
+            }
+            if (confirm(`Filter "${filterTag}" is not on the current job schedule.\n\nAdd it to the schedule so it is included in the next export?`)) {
+                upsertScheduleItem({ filterTag, ...meta, added: true });
+            }
+        }
+
+        function exportJobScheduleCSV() {
+            if (state.jobSchedule.length === 0) {
+                alert('No job schedule to export. Upload a schedule or add filters first.');
+                return;
+            }
+            const headers = ['Filter ID', 'Room', 'AHU', 'Size', 'Aspect Ratio', 'Filter Type', 'Area', 'Job', 'Added In App', 'Tested'];
+            const tested = testedMap();
+            const lines = [headers.map(escapeCsvField).join(',')];
+            state.jobSchedule.forEach(s => {
+                const row = [
+                    s.filterTag,
+                    s.room || '',
+                    s.ahu || '',
+                    s.size || '',
+                    s.aspect || '',
+                    s.type || '',
+                    s.area || '',
+                    s.job || '',
+                    s.added ? 'Yes' : '',
+                    tested.has(s.filterTag) ? 'Yes' : ''
+                ];
+                lines.push(row.map(escapeCsvField).join(','));
+            });
+            const bom = '\uFEFF';
+            const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const stamp = formatGMPDate(new Date()).replace(/\//g, '-');
+            a.download = `HEPA_Job_Schedule_${stamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
 
 function handleJobCSVImport(e) {
@@ -888,13 +1054,43 @@ function handleJobCSVImport(e) {
                         alert('No filters could be read: every row had an empty Filter ID.');
                         return;
                     }
-                    if (state.jobSchedule.length > 0 &&
-                        !confirm(`Replace the current schedule (${state.jobSchedule.length} filters) with this file (${items.length} filters)?\n\nYour recorded test results are not affected.`)) {
-                        return;
+
+                    let mode = 'replace';
+                    if (state.jobSchedule.length > 0) {
+                        const choice = prompt(
+                            `Current schedule has ${state.jobSchedule.length} filter(s).\nIncoming file has ${items.length} filter(s).\n\n` +
+                            `Type MERGE to add/update filters from the file (keeps filters already on the schedule),\n` +
+                            `or REPLACE to discard the current schedule and use only the file.\n\n` +
+                            `Cancel to abort.`,
+                            'MERGE'
+                        );
+                        if (choice == null) return;
+                        const c = String(choice).trim().toUpperCase();
+                        if (c === 'MERGE' || c === 'M') mode = 'merge';
+                        else if (c === 'REPLACE' || c === 'R') mode = 'replace';
+                        else {
+                            alert('Unrecognised choice. Import cancelled. Type MERGE or REPLACE next time.');
+                            return;
+                        }
                     }
 
-                    state.jobSchedule = items;
-                    state.jobScheduleMeta = { file: file.name, loaded: formatGMPDate(new Date()) };
+                    let added = 0, updated = 0, unchanged = 0;
+                    if (mode === 'replace') {
+                        // Preserve "added in app" flags for tags that still appear in the new file
+                        const prevAdded = new Set(state.jobSchedule.filter(s => s.added).map(s => s.filterTag));
+                        items.forEach(it => { if (prevAdded.has(it.filterTag)) it.added = true; });
+                        state.jobSchedule = items;
+                        added = items.length;
+                    } else {
+                        items.forEach(it => {
+                            const r = upsertScheduleItem(it, { silent: true });
+                            if (r === 'added') added++;
+                            else if (r === 'updated') updated++;
+                            else unchanged++;
+                        });
+                    }
+
+                    state.jobScheduleMeta = { file: file.name, loaded: formatGMPDate(new Date()), mode };
                     persistSchedule();
                     renderScheduleSelector();
 
@@ -903,7 +1099,10 @@ function handleJobCSVImport(e) {
                     const missing = Object.keys(names).filter(k => map[k] === -1).map(k => names[k]);
                     const already = items.filter(it => testedMap().has(it.filterTag)).length;
 
-                    let msg = `Imported ${items.length} filters from "${file.name}".\n\nColumns used: ${found.join(', ') || 'none'}.`;
+                    let msg = mode === 'replace'
+                        ? `Replaced schedule with ${items.length} filters from "${file.name}".`
+                        : `Merged "${file.name}" into schedule:\n  • ${added} added\n  • ${updated} updated\n  • ${unchanged} unchanged\n  • Schedule now has ${state.jobSchedule.length} filter(s).`;
+                    msg += `\n\nColumns used: ${found.join(', ') || 'none'}.`;
                     if (tagFallback) msg += `\nNo Filter ID column was recognised, so the FIRST column ("${headers[0]}") was used as the Filter ID.`;
                     if (missing.length) msg += `\nNot found (left blank): ${missing.join(', ')}.`;
                     if (blankTag || dupes.length) msg += `\nSkipped: ${blankTag} row(s) with no Filter ID, ${dupes.length} duplicate ID(s)${dupes.length ? ' (' + dupes.slice(0, 5).join(', ') + (dupes.length > 5 ? ', ...' : '') + ')' : ''}.`;
@@ -923,12 +1122,14 @@ function renderScheduleSelector() {
             const select = document.getElementById('schedule-filter-select');
             const statusText = document.getElementById('schedule-status-text');
             const clearBtn = document.getElementById('btn-clear-schedule');
+            const exportBtn = document.getElementById('btn-export-schedule');
             const n = state.jobSchedule.length;
 
             if (n === 0) {
                 container.classList.add('hidden');
                 clearBtn.classList.add('hidden');
-                statusText.textContent = 'No job schedule loaded. Upload a CSV with a Filter ID column (Room, AHU, Size, Aspect Ratio optional).';
+                if (exportBtn) exportBtn.classList.add('hidden');
+                statusText.textContent = 'No job schedule loaded. Upload a CSV with a Filter ID column (Room, AHU, Size, Aspect Ratio optional), or add filters with “Add to schedule”.';
                 return;
             }
 
@@ -943,28 +1144,33 @@ function renderScheduleSelector() {
             const ahuF = ahuSel.value;
             const hideTested = document.getElementById('schedule-hide-tested').checked;
 
-            let shown = 0, testedCount = 0;
+            let shown = 0, testedCount = 0, addedCount = 0;
             const opts = [];
             state.jobSchedule.forEach((s, idx) => {
                 const done = tested.has(s.filterTag);
                 if (done) testedCount++;
+                if (s.added) addedCount++;
                 if (ahuF && s.ahu !== ahuF) return;
                 if (hideTested && done) return;
                 if (q && !`${s.filterTag} ${s.room} ${s.ahu}`.toUpperCase().includes(q)) return;
                 shown++;
-                opts.push(`<option value="${idx}">${done ? '\u2713 ' : ''}${escapeHtml(s.filterTag)} | Room ${escapeHtml(s.room || '-')} | AHU ${escapeHtml(s.ahu || '-')} | ${escapeHtml(s.size || '-')}</option>`);
+                const mark = (done ? '\u2713 ' : '') + (s.added ? '\u2605 ' : '');
+                opts.push(`<option value="${idx}">${mark}${escapeHtml(s.filterTag)} | Room ${escapeHtml(s.room || '-')} | AHU ${escapeHtml(s.ahu || '-')} | ${escapeHtml(s.size || '-')}</option>`);
             });
 
             container.classList.remove('hidden');
             clearBtn.classList.remove('hidden');
+            if (exportBtn) exportBtn.classList.remove('hidden');
             select.innerHTML = '<option value="">-- Choose filter from uploaded schedule --</option>' + opts.join('');
             select.value = '';
 
             const rooms = new Set(state.jobSchedule.map(s => s.room).filter(Boolean)).size;
             const fileTxt = state.jobScheduleMeta && state.jobScheduleMeta.file ? ` \u00b7 "${state.jobScheduleMeta.file}"` : '';
-            statusText.textContent = `${n} filters loaded \u00b7 ${rooms} rooms \u00b7 ${ahus.length} AHUs${fileTxt}`;
+            statusText.textContent = `${n} filters loaded \u00b7 ${rooms} rooms \u00b7 ${ahus.length} AHUs${addedCount ? ' \u00b7 ' + addedCount + ' added in app' : ''}${fileTxt}`;
             document.getElementById('schedule-count-text').textContent =
-                `Showing ${shown} of ${n} \u00b7 ${testedCount} tested \u00b7 ${n - testedCount} remaining` + (opts.length === 0 ? ' \u2014 nothing matches the current search/filters' : '');
+                `Showing ${shown} of ${n} \u00b7 ${testedCount} tested \u00b7 ${n - testedCount} remaining` +
+                (addedCount ? ` \u00b7 ${addedCount} added in app (\u2605)` : '') +
+                (opts.length === 0 ? ' \u2014 nothing matches the current search/filters' : '');
         }
 
         function selectNextUntested() {
@@ -1136,47 +1342,49 @@ function updateVaultBadge() {
         }
 
         // --- DAILY SETUP BANNER & VERIFICATION ---
-        function renderEquipmentSetupRows() {
+function renderEquipmentSetupRows() {
             const container = document.getElementById('equipment-setup-rows');
             container.innerHTML = '';
+            const locked = state.setupLocked;
 
             EQUIP_CATEGORIES.forEach((cat) => {
                 const matchedList = state.equipmentMaster.filter(e => e.category === cat);
                 let optionsHtml = `<option value="">Select MTM...</option>`;
                 matchedList.forEach(m => {
                     const selected = (state.dailyEquipment[cat] && state.dailyEquipment[cat].mtm === m.mtm) ? 'selected' : '';
-                    optionsHtml += `<option value="${m.mtm}" ${selected}>${m.mtm} (${m.serial})</option>`;
+                    const expired = isCalibrationExpired(m.due);
+                    optionsHtml += `<option value="${escapeHtml(m.mtm)}" ${selected} ${expired && !selected ? 'disabled' : ''}>${escapeHtml(m.mtm)} (${escapeHtml(m.serial)})${expired ? ' - CALIBRATION EXPIRED' : ''}</option>`;
                 });
 
                 const currentEq = state.dailyEquipment[cat];
                 const div = document.createElement('div');
                 div.className = "bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2";
                 div.innerHTML = `
-                    <span class="text-[11px] font-bold text-slate-700 block">${cat}</span>
+                    <span class="text-[11px] font-bold text-slate-700 block">${escapeHtml(cat)}</span>
                     <div>
-                        <select onchange="handleSetupMtmChange('${cat}', this.value)" class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                        <select ${locked ? 'disabled' : ''} onchange="handleSetupMtmChange('${cat}', this.value)" class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                             ${optionsHtml}
                         </select>
                     </div>
                     <div id="setup-info-${cat.replace(/\s+/g, '-')}" class="text-[10px] space-y-0.5 text-slate-500">
-                        <div>S/N: <span class="font-mono text-slate-700">${currentEq ? currentEq.serial : '-'}</span></div>
-                        <div>Cal: <span class="text-slate-700">${currentEq ? currentEq.calDate : '-'}</span></div>
-                        <div>Cert: <span class="text-slate-700">${currentEq ? currentEq.cert : '-'}</span></div>
+                        <div>S/N: <span class="font-mono text-slate-700">${currentEq ? escapeHtml(currentEq.serial) : '-'}</span></div>
+                        <div>Cal: <span class="text-slate-700">${currentEq ? escapeHtml(currentEq.calDate) : '-'}</span></div>
+                        <div>Cert: <span class="text-slate-700">${currentEq ? escapeHtml(currentEq.cert) : '-'}</span></div>
                     </div>
                 `;
                 container.appendChild(div);
             });
         }
 
-        function handleSetupMtmChange(category, selectedMtm) {
+function handleSetupMtmChange(category, selectedMtm) {
             const matched = state.equipmentMaster.find(e => e.category === category && e.mtm === selectedMtm);
             const infoDiv = document.getElementById(`setup-info-${category.replace(/\s+/g, '-')}`);
             if (matched) {
-                state.dailyEquipment[category] = matched;
+                state.dailyEquipment[category] = JSON.parse(JSON.stringify(matched));
                 infoDiv.innerHTML = `
-                    <div>S/N: <span class="font-mono text-slate-800 font-bold">${matched.serial}</span></div>
-                    <div>Cal: <span class="text-slate-800 font-medium">${matched.calDate}</span></div>
-                    <div>Cert: <span class="text-slate-800 font-medium">${matched.cert}</span></div>
+                    <div>S/N: <span class="font-mono text-slate-800 font-bold">${escapeHtml(matched.serial)}</span></div>
+                    <div>Cal: <span class="text-slate-800 font-medium">${escapeHtml(matched.calDate)}</span></div>
+                    <div>Cert: <span class="text-slate-800 font-medium">${escapeHtml(matched.cert)}</span></div>
                 `;
             } else {
                 delete state.dailyEquipment[category];
@@ -1297,6 +1505,13 @@ function updateVaultBadge() {
         }
 
         function handleCanvasClick(e) {
+            // Defects are not allowed when NLD is selected
+            const selectedStatus = document.querySelector('input[name="test-status"]:checked')?.value;
+            if (selectedStatus === 'NLD') {
+                alert('Defect markers cannot be added while status is NLD (No Leak Detected).\n\nSelect NLDAR or LDNR first if you need to plot leaks.');
+                return;
+            }
+
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left, y = e.clientY - rect.top;
             const w = canvas.width, h = canvas.height;
@@ -1352,6 +1567,10 @@ function updateVaultBadge() {
                 effInput.value = 'No leakage detected';
                 effInput.readOnly = true;
                 effInput.className = "w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 cursor-not-allowed";
+                // NLD means no leaks – clear any plotted defects immediately
+                if (state.canvasMarkers.length > 0) {
+                    clearCanvasMarkers();
+                }
             } else {
                 effStar.classList.remove('hidden');
                 if (effInput.value === 'No leakage detected') effInput.value = '';
@@ -1384,8 +1603,14 @@ function updateVaultBadge() {
                 return;
             }
 
+            // NLD: ensure canvas is clean (markers should already be cleared on status change)
             if (status === 'NLD' && state.canvasMarkers.length > 0) {
-                openModal('modal-nld-conflict');
+                clearCanvasMarkers();
+            }
+
+            // NLDAR / LDNR: at least one defect location must be plotted on the canvas
+            if ((status === 'NLDAR' || status === 'LDNR') && state.canvasMarkers.length === 0) {
+                alert('NLDAR and LDNR require at least one defect location on the filter face canvas.\n\nClick the canvas to mark the leak position(s) before committing.');
                 return;
             }
 
@@ -1450,6 +1675,16 @@ function updateVaultBadge() {
 
             saveRecords();
             renderRecordsTable();
+
+            // If a job schedule is loaded and this tag is missing, offer to add it
+            ensureScheduleHasFilter(recordData.filterTag, {
+                room: recordData.room,
+                ahu: recordData.ahu,
+                size: recordData.size,
+                aspect: recordData.canvasShape
+            });
+            renderScheduleSelector();
+
             executeFormReset();
             alert("Test record successfully saved to local vault.");
         }
@@ -1530,54 +1765,81 @@ function updateVaultBadge() {
         }
 
         // --- EQUIPMENT VAULT ---
-        function renderEquipmentTable() {
+function renderEquipmentTable() {
             const tbody = document.getElementById('equip-table-body');
-            tbody.innerHTML = '';
-            state.equipmentMaster.forEach(eq => {
-                tbody.innerHTML += `
+            if (state.equipmentMaster.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">No instruments registered. Add one above or upload a CSV.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = state.equipmentMaster.map(eq => `
                     <tr class="hover:bg-slate-50">
                         <td class="p-3 font-semibold text-slate-800">${escapeHtml(eq.category)}</td>
                         <td class="p-3 font-mono font-bold text-sky-700">${escapeHtml(eq.mtm)}</td>
                         <td class="p-3 font-mono text-slate-600">${escapeHtml(eq.serial)}</td>
                         <td class="p-3">${escapeHtml(eq.calDate)}</td>
-                        <td class="p-3 font-medium text-slate-700">${escapeHtml(eq.due)}</td>
+                        <td class="p-3 font-medium text-slate-700">${escapeHtml(eq.due)}${isCalibrationExpired(eq.due) ? ' <span class="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded border bg-red-100 text-red-700 border-red-300">EXPIRED</span>' : ''}</td>
                         <td class="p-3 font-mono text-slate-600">${escapeHtml(eq.cert)}</td>
                         <td class="p-3 text-right space-x-2">
                             <button onclick="editEquipment('${escapeHtml(eq.id)}')" class="text-sky-600 hover:text-sky-800 font-bold">Edit</button>
                             <button onclick="deleteEquipment('${escapeHtml(eq.id)}')" class="text-red-500 hover:text-red-700 font-bold">Delete</button>
                         </td>
-                    </tr>
-                `;
-            });
+                    </tr>`).join('');
         }
 
-        function autoCalculateCalDue() {
+function autoCalculateCalDue() {
             const calVal = document.getElementById('equip-cal-date').value;
             if (!calVal) return;
-            const d = new Date(calVal);
-            d.setFullYear(d.getFullYear() + 1);
-            document.getElementById('equip-due-date').value = formatGMPDate(d);
+            const [y, m, d] = calVal.split('-').map(Number);
+            document.getElementById('equip-due-date').value = formatGMPDate(addOneYearSafe(new Date(y, m - 1, d)));
         }
 
-        function handleSaveEquipment(e) {
+function handleSaveEquipment(e) {
             e.preventDefault();
             const editId = document.getElementById('equip-edit-id').value;
             const category = document.getElementById('equip-category').value;
             const mtm = document.getElementById('equip-mtm').value.trim().toUpperCase();
-            const serial = document.getElementById('equip-serial').value.trim().toUpperCase();
+            let serial = document.getElementById('equip-serial').value.trim().toUpperCase();
             const calDateRaw = document.getElementById('equip-cal-date').value;
-            const cert = document.getElementById('equip-cert').value.trim().toUpperCase();
+            let cert = document.getElementById('equip-cert').value.trim().toUpperCase();
+            const isGenerator = category === 'Generator';
 
-            const [y, m, d] = calDateRaw.split('-').map(Number);
-            const calDateObj = new Date(y, m - 1, d);
-            const dueObj = new Date(y, m - 1, d);
-            dueObj.setFullYear(dueObj.getFullYear() + 1);
+            if (!mtm) { alert('MTM ID cannot be blank.'); return; }
+
+            // Generators are not calibrated – N/A is the required GMP value (blank is not allowed)
+            if (isGenerator) {
+                if (!serial || isNA(serial)) serial = 'N/A';
+                if (!cert || isNA(cert)) cert = 'N/A';
+            } else {
+                if (!serial || isNA(serial)) { alert('Serial number cannot be blank (use a real serial, or N/A only for Generators).'); return; }
+                if (!cert || isNA(cert)) { alert('Certificate number cannot be blank (use a real cert, or N/A only for Generators).'); return; }
+                if (!calDateRaw) { alert('Calibration Date is required.'); return; }
+            }
+
+            // Uniqueness is per category: the same MTM may exist on different equipment types
+            const dup = state.equipmentMaster.find(i => i.category === category && i.mtm === mtm && i.id !== editId);
+            if (dup) {
+                alert(`MTM ID ${mtm} is already registered in category "${category}" (S/N ${dup.serial}).\nWithin the same category MTM IDs must be unique — edit that instrument instead.`);
+                return;
+            }
+
+            let calDateFormatted, dueDateFormatted;
+            if (isGenerator && (!calDateRaw || isNA(calDateRaw))) {
+                calDateFormatted = 'N/A';
+                dueDateFormatted = 'N/A';
+            } else {
+                if (!calDateRaw) { alert('Calibration Date is required.'); return; }
+                const [y, m, d] = calDateRaw.split('-').map(Number);
+                const calDateObj = new Date(y, m - 1, d);
+                const dueObj = addOneYearSafe(calDateObj);
+                calDateFormatted = formatGMPDate(calDateObj);
+                dueDateFormatted = formatGMPDate(dueObj);
+            }
 
             if (editId) {
                 const idx = state.equipmentMaster.findIndex(i => i.id === editId);
-                if (idx !== -1) state.equipmentMaster[idx] = { id: editId, category, mtm, serial, calDate: formatGMPDate(calDateObj), due: formatGMPDate(dueObj), cert };
+                if (idx !== -1) state.equipmentMaster[idx] = { id: editId, category, mtm, serial, calDate: calDateFormatted, due: dueDateFormatted, cert };
             } else {
-                state.equipmentMaster.push({ id: Date.now().toString(), category, mtm, serial, calDate: formatGMPDate(calDateObj), due: formatGMPDate(dueObj), cert });
+                state.equipmentMaster.push({ id: Date.now().toString(), category, mtm, serial, calDate: calDateFormatted, due: dueDateFormatted, cert });
             }
 
             saveEquipMaster();
@@ -1613,6 +1875,266 @@ function updateVaultBadge() {
             document.getElementById('equip-due-date').value = '';
         }
 
+        // ===== BULK INSTRUMENT UPLOAD (CSV) =====
+        function addOneYearSafe(d) {
+            // +1 year; a 29 FEB calibration falls due 28 FEB (never later than the true anniversary)
+            const r = new Date(d.getFullYear() + 1, d.getMonth(), d.getDate());
+            if (r.getMonth() !== d.getMonth()) return new Date(d.getFullYear() + 1, d.getMonth() + 1, 0);
+            return r;
+        }
+
+        function makeLocalDate(y, m, d) {
+            const dt = new Date(y, m - 1, d);
+            return (dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d) ? dt : null;
+        }
+
+        // Reads the date styles people actually have in spreadsheets. Slash/dash dates are DAY-first (5/3/2026 = 5 March).
+        function parseFlexibleDate(raw) {
+            let s = String(raw == null ? '' : raw).trim().replace(/^'/, '');
+            if (!s) return null;
+            s = s.replace(/[T\s]+\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(AM|PM)?\s*(Z|[+-]\d{2}:?\d{2})?$/i, '').trim();
+            const yr = (v) => { const n = parseInt(v, 10); return v.length === 2 ? 2000 + n : n; };
+            let m;
+            if ((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/.exec(s))) return makeLocalDate(+m[1], +m[2], +m[3]);
+            if ((m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/.exec(s))) return makeLocalDate(yr(m[3]), +m[2], +m[1]);
+            if ((m = /^(\d{1,2})[\s\/\-.]*([A-Za-z]{3,9})[\s\/\-.,]*(\d{2}|\d{4})$/.exec(s))) {
+                const mi = MONTHS.indexOf(m[2].slice(0, 3).toUpperCase());
+                return mi === -1 ? null : makeLocalDate(yr(m[3]), mi + 1, +m[1]);
+            }
+            if (/^\d{5}$/.test(s) && +s > 30000 && +s < 70000) { // Excel serial date
+                const dt = new Date(Math.round((+s - 25569) * 86400000));
+                return makeLocalDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+            }
+            return null;
+        }
+
+        function matchEquipCategory(raw) {
+            const n = normHeader(raw);
+            if (!n) return '';
+            const table = [['photometer', 'Photometer'], ['anemometer', 'Anemometer'], ['manometer', 'Manometer (Micrometer)'],
+                           ['micrometer', 'Manometer (Micrometer)'], ['gauge', 'Gauge'], ['generator', 'Generator']];
+            const hit = table.find(([k]) => n.includes(k));
+            return hit ? hit[1] : '';
+        }
+
+        function mapEquipColumns(headers) {
+            const norm = headers.map(normHeader);
+            const find = (exact, partialFn) => {
+                let i = norm.findIndex(h => exact.includes(h));
+                if (i === -1 && partialFn) i = norm.findIndex(partialFn);
+                return i;
+            };
+            return {
+                category: find(['category', 'equipmentcategory', 'equipmenttype', 'instrumenttype', 'instrument', 'equipment', 'type']),
+                mtm: find(['mtm', 'mtmid', 'mtmno', 'mtmnumber', 'assetid', 'assetno', 'equipmentid', 'id']),
+                serial: find(['serial', 'serialno', 'serialnumber', 'serialnum', 'sn']),
+                cal: find(['caldate', 'calibrationdate', 'calibrated', 'calibrateddate', 'dateofcalibration', 'lastcalibration', 'lastcaldate'],
+                          h => h.includes('cal') && !/due|next|cert|expir/.test(h)),
+                due: find(['due', 'duedate', 'caldue', 'calduedate', 'calibrationdue', 'calibrationduedate', 'nextcalibration', 'nextcaldate', 'nextcalibrationdate', 'expiry', 'expirydate', 'expires'],
+                          h => /due|expir/.test(h)),
+                cert: find(['cert', 'certno', 'certnumber', 'certificate', 'certificateno', 'certificatenumber', 'certid'], h => h.includes('cert'))
+            };
+        }
+
+        function showEquipImportReport(html) {
+            const el = document.getElementById('equip-import-report');
+            if (!el) return;
+            el.innerHTML = html;
+            el.classList.remove('hidden');
+        }
+
+        function equipCsvDownload(filename, rows) {
+            const text = '\uFEFF' + rows.map(r => r.map(escapeCsvField).join(',')).join('\r\n');
+            const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+        const EQUIP_CSV_HEADER = ['Category', 'MTM ID', 'Serial Number', 'Calibration Date', 'Calibration Due Date', 'Certificate Number'];
+
+        function downloadEquipTemplate() {
+            const cal = formatGMPDate(new Date());
+            const rows = [EQUIP_CSV_HEADER].concat(EQUIP_CATEGORIES.map((c, i) => {
+                // Generators are not calibrated – N/A is the required GMP placeholder
+                if (c === 'Generator') {
+                    return [c, `EXAMPLE-MTM-${i + 1}`, 'N/A', 'N/A', 'N/A', 'N/A'];
+                }
+                return [c, `EXAMPLE-MTM-${i + 1}`, `EXAMPLE-SN-${i + 1}`, cal, '', `EXAMPLE-CERT-${i + 1}`];
+            }));
+            equipCsvDownload('HEPA_Equipment_Upload_Template.csv', rows);
+        }
+
+        function exportEquipmentCSV() {
+            if (state.equipmentMaster.length === 0) { alert('There are no instruments in the vault to export.'); return; }
+            const rows = [EQUIP_CSV_HEADER].concat(state.equipmentMaster.map(e => [e.category, e.mtm, e.serial, e.calDate, e.due, e.cert]));
+            equipCsvDownload(`HEPA_Equipment_Vault_${formatGMPDate(new Date()).replace(/\//g, '-')}.csv`, rows);
+        }
+
+
+        function handleEquipCSVImport(e) {
+                    const input = e.target;
+                    const file = input.files[0];
+                    if (!file) return;
+        
+                    const reader = new FileReader();
+                    reader.onerror = function () { alert('The file could not be read.'); };
+                    reader.onload = function (evt) {
+                        try {
+                            const text = decodeCsvBuffer(evt.target.result);
+                            if (/[\u0000-\u0008\u000E-\u001F]/.test(text)) {
+                                alert('This does not look like a CSV text file (it contains binary data). Save the sheet from Excel as "CSV" and try again.');
+                                return;
+                            }
+                            const { rows } = parseCSVText(text);
+                            const hi = rows.findIndex(r => r.some(c => String(c).trim() !== ''));
+                            if (hi === -1 || rows.slice(hi + 1).every(r => r.every(c => String(c).trim() === ''))) {
+                                alert('No data rows found. The file needs a header row plus at least one instrument row.');
+                                return;
+                            }
+        
+                            const headers = rows[hi].map(h => String(h).trim());
+                            const map = mapEquipColumns(headers);
+                            const required = [['category', 'Category'], ['mtm', 'MTM ID'], ['serial', 'Serial Number'], ['cal', 'Calibration Date'], ['cert', 'Certificate Number']];
+                            const missingCols = required.filter(([k]) => map[k] === -1).map(([, n]) => n);
+                            if (missingCols.length) {
+                                alert(`Cannot import: required column(s) not found: ${missingCols.join(', ')}.\n\nColumns in your file: ${headers.join(', ')}\n\nUse "Download Template" to see the expected layout.`);
+                                return;
+                            }
+        
+                            const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+                            // Key = category|mtm  → MTM may repeat across different categories
+                            const good = [], errors = [], seenKey = new Map();
+                            let dataRows = 0;
+                            for (let r = hi + 1; r < rows.length; r++) {
+                                const cols = rows[r];
+                                if (!cols.some(c => String(c).trim() !== '')) continue;
+                                dataRows++;
+                                const rowNo = r + 1;
+                                const get = i => (i >= 0 && i < cols.length) ? String(cols[i]).trim() : '';
+                                const category = matchEquipCategory(get(map.category));
+                                const mtm = get(map.mtm).toUpperCase(), serial = get(map.serial).toUpperCase(), cert = get(map.cert).toUpperCase();
+                                const calD = parseFlexibleDate(get(map.cal));
+                                const dueGiven = map.due !== -1 && get(map.due) !== '';
+                                const dueD = dueGiven ? parseFlexibleDate(get(map.due)) : null;
+        
+                                const isGenerator = category === 'Generator';
+                                const serialRaw = get(map.serial);
+                                const certRaw = get(map.cert);
+                                const calRaw = get(map.cal);
+                                const dueRaw = map.due !== -1 ? get(map.due) : '';
+
+                                const problems = [];
+                                if (!category) problems.push(`category "${get(map.category)}" not recognised`);
+                                if (!mtm) problems.push('MTM ID is empty');
+
+                                // Generators: N/A is the required GMP value (blank is not allowed)
+                                let serialOut = serial, certOut = cert;
+                                if (isGenerator) {
+                                    if (!serialRaw || isNA(serialRaw)) serialOut = 'N/A';
+                                    if (!certRaw || isNA(certRaw)) certOut = 'N/A';
+                                } else {
+                                    if (!serial) problems.push('serial number is empty');
+                                    if (!cert) problems.push('certificate number is empty');
+                                    if (isNA(serialRaw)) problems.push('serial number N/A is only allowed for Generators');
+                                    if (isNA(certRaw)) problems.push('certificate N/A is only allowed for Generators');
+                                }
+
+                                let calOut, dueOut, customDue = false;
+                                if (isGenerator && (isNA(calRaw) || !calRaw)) {
+                                    calOut = 'N/A';
+                                    dueOut = (isNA(dueRaw) || !dueRaw) ? 'N/A' : (dueD ? formatGMPDate(dueD) : 'N/A');
+                                    if (dueRaw && !isNA(dueRaw) && !dueD) problems.push(`due date "${dueRaw}" not understood`);
+                                } else {
+                                    if (!calD) problems.push(calRaw ? `calibration date "${calRaw}" not understood` : 'calibration date is empty');
+                                    else if (calD > today0) problems.push('calibration date is in the future');
+                                    if (dueGiven) {
+                                        if (!dueD) problems.push(`due date "${dueRaw}" not understood`);
+                                        else if (calD && dueD <= calD) problems.push('due date is not after the calibration date');
+                                    }
+                                    if (calD) {
+                                        const due = dueGiven && dueD ? dueD : addOneYearSafe(calD);
+                                        calOut = formatGMPDate(calD);
+                                        dueOut = formatGMPDate(due);
+                                        customDue = dueGiven && dueD && formatGMPDate(due) !== formatGMPDate(addOneYearSafe(calD));
+                                    }
+                                }
+
+                                const key = category ? `${category}|${mtm}` : '';
+                                if (key && seenKey.has(key)) problems.push(`MTM ID ${mtm} repeated in the same category (first on row ${seenKey.get(key)})`);
+                                if (problems.length) { errors.push(`Row ${rowNo}${mtm ? ' (' + mtm + ')' : ''}: ${problems.join('; ')}`); continue; }
+        
+                                if (key) seenKey.set(key, rowNo);
+                                good.push({
+                                    rowNo, category, mtm, serial: serialOut, cert: certOut,
+                                    calDate: calOut, due: dueOut, customDue
+                                });
+                            }
+        
+                            // Match existing vault instruments by (category + MTM)
+                            const byKey = new Map(state.equipmentMaster.map(i => [`${i.category}|${i.mtm}`, i]));
+                            const toAdd = [], toUpdate = [], unchanged = [];
+                            good.forEach(g => {
+                                const key = `${g.category}|${g.mtm}`;
+                                const ex = byKey.get(key);
+                                if (!ex) { toAdd.push(g); return; }
+                                const same = ex.serial === g.serial && ex.cert === g.cert && ex.calDate === g.calDate && ex.due === g.due;
+                                (same ? unchanged : toUpdate).push({ g, ex });
+                            });
+        
+                            const errHtml = errors.length
+                                ? `<div class="mt-2 font-semibold text-red-700">${errors.length} row(s) skipped:</div><ul class="list-disc ml-5 max-h-40 overflow-y-auto text-red-700">${errors.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : '';
+                            const head = `<div class="font-bold text-slate-800">${escapeHtml(file.name)} &mdash; ${dataRows} row(s) read</div>`;
+        
+                            if (toAdd.length === 0 && toUpdate.length === 0) {
+                                showEquipImportReport(head + `<div>Nothing to import: ${unchanged.length} instrument(s) already match the vault.</div>` + errHtml);
+                                alert(unchanged.length ? `Nothing to change - ${unchanged.length} instrument(s) already match the vault.` + (errors.length ? `\n${errors.length} row(s) had problems (see the report on the page).` : '')
+                                                       : `No instruments could be imported - ${errors.length} row(s) had problems (see the report on the page).`);
+                                return;
+                            }
+        
+                            const expiredCount = toAdd.map(g => g).concat(toUpdate.map(x => x.g)).filter(g => isCalibrationExpired(g.due)).length;
+                            const customDueCount = toAdd.concat(toUpdate.map(x => x.g)).filter(g => g.customDue).length;
+                            let msg = `Import ${file.name}?\n\n  \u2022 ${toAdd.length} new instrument(s) will be ADDED\n  \u2022 ${toUpdate.length} existing instrument(s) will be UPDATED (matched by MTM ID)\n  \u2022 ${unchanged.length} already match and stay as they are`;
+                            if (errors.length) msg += `\n  \u2022 ${errors.length} row(s) will be SKIPPED (errors)`;
+                            if (expiredCount) msg += `\n\nNote: ${expiredCount} of these are already past their calibration due date - they will be stored but cannot be used for testing.`;
+                            if (customDueCount) msg += `\nNote: ${customDueCount} row(s) have a due date that is not calibration date + 1 year; the due date from the file is used.`;
+                            if (errors.length) msg += `\n\nFirst problem: ${errors[0]}`;
+                            msg += `\n\nTest records already saved are not affected.`;
+                            if (!confirm(msg)) {
+                                showEquipImportReport(head + `<div>Import cancelled - nothing was changed.</div>` + errHtml);
+                                return;
+                            }
+        
+                            const next = state.equipmentMaster.slice();
+                            toUpdate.forEach(({ g, ex }) => {
+                                const idx = next.findIndex(i => i.id === ex.id);
+                                if (idx !== -1) next[idx] = { id: ex.id, category: g.category, mtm: g.mtm, serial: g.serial, calDate: g.calDate, due: g.due, cert: g.cert };
+                            });
+                            const stamp = Date.now();
+                            toAdd.forEach((g, i) => next.push({ id: `${stamp}${String(i).padStart(3, '0')}`, category: g.category, mtm: g.mtm, serial: g.serial, calDate: g.calDate, due: g.due, cert: g.cert }));
+        
+                            const prev = state.equipmentMaster;
+                            state.equipmentMaster = next;
+                            try { localStorage.setItem('hepa_equip_master', JSON.stringify(next)); }
+                            catch (err) {
+                                state.equipmentMaster = prev;
+                                alert('STORAGE ERROR - the instruments could NOT be saved and the vault is unchanged. Free up browser storage and try again.');
+                                return;
+                            }
+                            renderEquipmentTable();
+                            renderEquipmentSetupRows();
+                            showEquipImportReport(head +
+                                `<div class="text-emerald-700 font-semibold">Imported: ${toAdd.length} added, ${toUpdate.length} updated, ${unchanged.length} unchanged.${expiredCount ? ' ' + expiredCount + ' already past due.' : ''}</div>` + errHtml);
+                            alert(`Equipment import complete: ${toAdd.length} added, ${toUpdate.length} updated, ${unchanged.length} unchanged` + (errors.length ? `, ${errors.length} skipped (see the report on the page).` : '.'));
+                        } catch (err) {
+                            alert('Error reading equipment CSV: ' + err.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                    input.value = '';
+                }
         // --- RECORDS VAULT ---
         function renderRecordsTable() {
             const tbody = document.getElementById('records-table-body');
