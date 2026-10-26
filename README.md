@@ -1,5 +1,11 @@
 # HEPA-Tester
 
+## Live Site:
+[HEPA Tester
+](https://hepa-tester.github.io/HEPA-Tester/index.html)
+
+Note: working on a custom domain but this will do for now, this is hosted via GitHub pages. There may be limitations for GitHub pages which may justify Vercel/Firebase.
+
 ## File Contents:
 
 - HEPA_Spec-Pro_CSV-schedule-fix.html = main file.
